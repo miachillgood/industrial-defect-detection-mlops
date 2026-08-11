@@ -1,0 +1,6 @@
+outs:
+- md5: c9582ec38e87bb8b6f741b275fa832fd.dir
+  size: 5271225398
+  nfiles: 6642
+  hash: md5
+  path: mvtec_anomaly_detection

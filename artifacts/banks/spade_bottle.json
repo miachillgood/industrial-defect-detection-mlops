@@ -1,0 +1,21 @@
+{
+  "category": "bottle",
+  "backbone": "wide_resnet50_2",
+  "resize": 256,
+  "cropsize": 224,
+  "top_k": 5,
+  "n_train_images": 209,
+  "image_threshold": 6.780292987823486,
+  "pixel_threshold": 2.2088234424591064,
+  "calibration": {
+    "method": "leave-one-out over the defect-free training split",
+    "image_percentile": 99.0,
+    "pixel_percentile": 99.5,
+    "train_image_score_mean": 4.7539472579956055,
+    "train_image_score_std": 0.5721216797828674,
+    "train_image_score_max": 6.909356594085693,
+    "train_pixel_score_max": 3.1858670711517334
+  },
+  "torch": "2.13.0",
+  "created_utc": "2026-08-11T13:30:33Z"
+}

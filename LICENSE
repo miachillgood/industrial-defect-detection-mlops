@@ -1,0 +1,47 @@
+MIT License
+
+Copyright (c) 2026 miachillgood
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+THIRD-PARTY NOTICES
+
+This project implements the algorithm described in:
+
+    Niv Cohen and Yedid Hoshen,
+    "Sub-Image Anomaly Detection with Deep Pyramid Correspondences",
+    arXiv:2005.02357, 2020.
+
+Configuration and hyper-parameters are aligned with the third-party PyTorch
+implementation `byungjae89/SPADE-pytorch` (MIT License) so that the reported
+numbers can be checked against a public baseline. That repository is NOT an
+official release by the paper's authors; no public repository from the paper's
+authors was found.
+
+Not to be confused with `NVlabs/SPADE`, an unrelated image-synthesis method
+(spatially-adaptive normalization) that shares the acronym.
+
+The MVTec Anomaly Detection dataset is NOT distributed with this repository.
+It is released by MVTec Software GmbH under CC BY-NC-SA 4.0 for non-commercial
+research use only: https://www.mvtec.com/company/research/datasets/mvtec-ad
+
+Pretrained Wide-ResNet50-2 ImageNet weights are obtained from torchvision
+(BSD-3-Clause).

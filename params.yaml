@@ -1,0 +1,23 @@
+# Parameters for the DVC pipeline (`dvc repro`).
+# Changing any value here invalidates the downstream stages.
+
+evaluate:
+  # K=5 matches the public baseline byungjae89/SPADE-pytorch. The paper uses K=50.
+  top_k: 5
+  categories: all
+  device: auto
+  batch_size: 32
+  num_workers: 6
+  bank_dtype: float32
+  save_visualizations: 5
+  # Output directory name under artifacts/runs/. Bump it to keep an old run.
+  run_name: full-mvtec-k5
+
+bank:
+  # Category served by the FastAPI/Streamlit demo.
+  category: bottle
+  bank_dtype: float16
+  # Decision thresholds are percentiles of leave-one-out scores over the
+  # defect-free training split -- never the test split.
+  image_percentile: 99.0
+  pixel_percentile: 99.5

@@ -1,0 +1,105 @@
+schema: '2.0'
+stages:
+  build_bank:
+    cmd: python scripts/build_bank.py --category bottle --bank-dtype float16 
+      --image-percentile 99.0 --pixel-percentile 99.5 --output-dir 
+      artifacts/banks
+    deps:
+    - path: data/mvtec_anomaly_detection
+      hash: md5
+      md5: c9582ec38e87bb8b6f741b275fa832fd.dir
+      size: 5271225398
+      nfiles: 6642
+    - path: scripts/build_bank.py
+      hash: md5
+      md5: 91e4caf2977474368e9f8c830db65c2f
+      size: 5448
+    - path: src/spade
+      hash: md5
+      md5: 0019299bbc762ea158282bceea996d33.dir
+      size: 127589
+      nfiles: 18
+    params:
+      params.yaml:
+        bank:
+          category: bottle
+          bank_dtype: float16
+          image_percentile: 99.0
+          pixel_percentile: 99.5
+    outs:
+    - path: artifacts/banks/spade_bottle.json
+      hash: md5
+      md5: 0a21712a7195340b5b3aa6a1975a3638
+      size: 623
+    - path: artifacts/banks/spade_bottle.pt
+      hash: md5
+      md5: 5253fdc08d2d82235bcc61014de42852
+      size: 588119183
+  check_data:
+    cmd: python scripts/prepare_data.py --check-only --strict
+    deps:
+    - path: data/mvtec_anomaly_detection
+      hash: md5
+      md5: c9582ec38e87bb8b6f741b275fa832fd.dir
+      size: 5271225398
+      nfiles: 6642
+    - path: scripts/prepare_data.py
+      hash: md5
+      md5: 3483aee08e7d8cbb6c3bae2d03cf12d8
+      size: 5683
+  evaluate:
+    cmd: python -m spade.evaluate --categories all --top-k 5 --device auto 
+      --batch-size 32 --num-workers 6 --bank-dtype float32 --save-visualizations
+      5 --output-dir artifacts/runs --run-name full-mvtec-k5
+    deps:
+    - path: data/mvtec_anomaly_detection
+      hash: md5
+      md5: c9582ec38e87bb8b6f741b275fa832fd.dir
+      size: 5271225398
+      nfiles: 6642
+    - path: src/spade
+      hash: md5
+      md5: 0019299bbc762ea158282bceea996d33.dir
+      size: 127589
+      nfiles: 18
+    params:
+      params.yaml:
+        evaluate:
+          top_k: 5
+          categories: all
+          device: auto
+          batch_size: 32
+          num_workers: 6
+          bank_dtype: float32
+          save_visualizations: 5
+          run_name: full-mvtec-k5
+    outs:
+    - path: artifacts/runs/full-mvtec-k5/config.json
+      hash: md5
+      md5: 05a9cf36762cf7c5219e0ad32c4f38ee
+      size: 453
+    - path: artifacts/runs/full-mvtec-k5/images
+      hash: md5
+      md5: dac09677679257d73da77239f2604127.dir
+      size: 21187243
+      nfiles: 75
+    - path: artifacts/runs/full-mvtec-k5/metrics.json
+      hash: md5
+      md5: a37999b2b753f6f7667037d6f37ed3bd
+      size: 248
+    - path: artifacts/runs/full-mvtec-k5/results.json
+      hash: md5
+      md5: 904bf71405a9414e71d9fda85d0ae013
+      size: 6719
+    - path: artifacts/runs/full-mvtec-k5/results.md
+      hash: md5
+      md5: 8d2f743b3febd8be73987ff4150d3d07
+      size: 1661
+    - path: artifacts/runs/full-mvtec-k5/roc_curve.png
+      hash: md5
+      md5: 7a30de6f122c6656c4a402e721cf9c59
+      size: 207260
+    - path: artifacts/runs/full-mvtec-k5/roc_curves.json
+      hash: md5
+      md5: 430fb5a128f5d6dc00eadc43b5cd341c
+      size: 284719

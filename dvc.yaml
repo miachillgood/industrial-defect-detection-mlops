@@ -1,0 +1,76 @@
+# Reproducible pipeline: `dvc repro`
+#
+#   check_data -> evaluate -> build_bank
+#
+# `evaluate` scores every MVTec AD category and emits the two
+# headline metrics; `build_bank` produces the artifact the API and the review
+# tool serve.
+#
+# Split of responsibilities between git and DVC:
+#   * small, human-readable, or displayable outputs (JSON reports, ROC curve,
+#     localisation panels) are declared `cache: false` so git owns them -- they
+#     are the evidence you want visible in the repo;
+#   * the 5 GB dataset and the ~560 MB memory bank are DVC-cached and pushed to
+#     a remote, never to git.
+
+stages:
+  check_data:
+    cmd: python scripts/prepare_data.py --check-only --strict
+    deps:
+      - scripts/prepare_data.py
+      - data/mvtec_anomaly_detection
+    always_changed: false
+
+  evaluate:
+    cmd: >-
+      python -m spade.evaluate
+      --categories ${evaluate.categories}
+      --top-k ${evaluate.top_k}
+      --device ${evaluate.device}
+      --batch-size ${evaluate.batch_size}
+      --num-workers ${evaluate.num_workers}
+      --bank-dtype ${evaluate.bank_dtype}
+      --save-visualizations ${evaluate.save_visualizations}
+      --output-dir artifacts/runs
+      --run-name ${evaluate.run_name}
+    deps:
+      - data/mvtec_anomaly_detection
+      - src/spade
+    params:
+      - evaluate
+    metrics:
+      - artifacts/runs/${evaluate.run_name}/metrics.json:
+          cache: false
+    outs:
+      - artifacts/runs/${evaluate.run_name}/results.json:
+          cache: false
+      - artifacts/runs/${evaluate.run_name}/results.md:
+          cache: false
+      - artifacts/runs/${evaluate.run_name}/config.json:
+          cache: false
+      - artifacts/runs/${evaluate.run_name}/roc_curves.json:
+          cache: false
+      - artifacts/runs/${evaluate.run_name}/roc_curve.png:
+          cache: false
+      - artifacts/runs/${evaluate.run_name}/images:
+          cache: false
+
+  build_bank:
+    cmd: >-
+      python scripts/build_bank.py
+      --category ${bank.category}
+      --bank-dtype ${bank.bank_dtype}
+      --image-percentile ${bank.image_percentile}
+      --pixel-percentile ${bank.pixel_percentile}
+      --output-dir artifacts/banks
+    deps:
+      - data/mvtec_anomaly_detection
+      - scripts/build_bank.py
+      - src/spade
+    params:
+      - bank
+    outs:
+      # The one genuinely large artifact: DVC-cached, git only sees the hash.
+      - artifacts/banks/spade_${bank.category}.pt
+      - artifacts/banks/spade_${bank.category}.json:
+          cache: false

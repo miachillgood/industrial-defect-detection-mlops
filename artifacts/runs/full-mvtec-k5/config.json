@@ -1,0 +1,23 @@
+{
+  "data_root": "data/mvtec_anomaly_detection",
+  "resize": 256,
+  "cropsize": 224,
+  "backbone": "wide_resnet50_2",
+  "layers": [
+    "layer1",
+    "layer2",
+    "layer3"
+  ],
+  "top_k": 5,
+  "gaussian_sigma": 4.0,
+  "device": "auto",
+  "batch_size": 32,
+  "num_workers": 6,
+  "gallery_chunk": 4096,
+  "bank_dtype": "float32",
+  "seed": 42,
+  "output_dir": "artifacts/runs",
+  "save_visualizations": 5,
+  "categories": [],
+  "resolved_device": "mps"
+}

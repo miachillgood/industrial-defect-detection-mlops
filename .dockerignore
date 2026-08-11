@@ -1,0 +1,25 @@
+# Keep the build context small: it is copied to the daemon on every build.
+.git/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# ~5 GB of dataset and multi-hundred-MB memory banks are mounted at runtime,
+# never baked into the image.
+data/
+artifacts/
+.dvc/cache/
+.dvcstore/
+mlruns/
+mlartifacts/
+
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+.DS_Store
+.idea/
+.vscode/

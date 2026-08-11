@@ -1,0 +1,61 @@
+# Local stack: inference API + review tool + MLflow UI.
+#
+#   docker compose -f docker/docker-compose.yml up --build
+#
+# The memory bank is mounted, not baked in: it is data, versioned with DVC.
+# Build it first with `make bank` (or `dvc repro build_bank`).
+
+name: spade-mvtec
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: api
+    image: spade-api:local
+    ports:
+      - "8000:8000"
+    environment:
+      SPADE_BANK_DIR: /app/artifacts/banks
+      SPADE_DEVICE: cpu
+      SPADE_EAGER_LOAD: "1"
+    volumes:
+      - ../artifacts/banks:/app/artifacts/banks:ro
+    restart: unless-stopped
+
+  review:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: review
+    image: spade-review:local
+    ports:
+      - "8501:8501"
+    environment:
+      SPADE_BANK_DIR: /app/artifacts/banks
+      SPADE_DEVICE: cpu
+    volumes:
+      - ../artifacts/banks:/app/artifacts/banks:ro
+      - ../artifacts/reviews:/app/artifacts/reviews
+      # Read-only dataset mount so reviewers can page through the test split.
+      - ../data/mvtec_anomaly_detection:/app/data/mvtec_anomaly_detection:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.15.1
+    ports:
+      - "5000:5000"
+    command: >-
+      mlflow server
+      --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    volumes:
+      - mlflow-store:/mlflow
+    restart: unless-stopped
+
+volumes:
+  mlflow-store:

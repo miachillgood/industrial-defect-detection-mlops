@@ -1,0 +1,50 @@
+# --- data (versioned with DVC, never with git) ---------------------------
+# Only the DVC pointers are committed; the ~5 GB of PNGs live in the DVC cache.
+/data/*
+!/data/.gitkeep
+!/data/*.dvc
+!/data/.gitignore
+
+# --- model artifacts -----------------------------------------------------
+# Memory banks are hundreds of MB and DVC-tracked; run reports and figures are
+# small and deliberately committed as evidence.
+/artifacts/banks/*.pt
+/artifacts/runs/*/temp/
+/artifacts/*.log
+
+# Human review decisions are per-deployment runtime data, not source.
+/artifacts/reviews/*.jsonl
+/artifacts/reviews/*.csv
+
+# --- experiment tracking -------------------------------------------------
+/mlruns/
+/mlartifacts/
+mlflow.db
+
+# --- python --------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.python-version
+
+# --- tooling -------------------------------------------------------------
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+.mypy_cache/
+
+# --- os / editors --------------------------------------------------------
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# --- dvc local remote (see docs/mlops.md) ---
+/.dvcstore/
