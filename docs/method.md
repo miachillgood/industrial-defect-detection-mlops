@@ -139,4 +139,6 @@ SPADE(..., drop_gallery_remainder=True)
 - PyTorch 2.13.0 + torchvision 0.28.0，MPS 后端
 - Python 3.13
 
-CPU 与 MPS 结果一致到小数点后一位；换设备只影响速度。
+换设备只影响速度，不影响结果：`bottle` 与 `grid` 两类在 CPU 上重跑，四个指标（97.22 / 97.01 / 47.28 / 98.35）与 MPS 逐位相同。
+
+关于"完全一致"的一个例外：`artifacts/banks/*.pt` 的文件哈希每次构建都会变，因为元数据里带 `created_utc` 溯源时间戳。特征张量本身逐位相同——两次独立构建的 bank 做过 `torch.equal` 全量比对，唯一不同的键就是 `created_utc`。

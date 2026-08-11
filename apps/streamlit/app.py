@@ -57,6 +57,20 @@ def available_banks() -> list[str]:
     return sorted(p.stem.removeprefix("spade_") for p in BANK_DIR.glob("spade_*.pt"))
 
 
+def review_key(path: str) -> str:
+    """Repo-relative key for the review log.
+
+    Absolute paths would make the log useless on any other machine (and leak the
+    reviewer's home directory into a file that gets shared).
+    """
+    if not path or path.startswith("upload://"):
+        return path
+    try:
+        return Path(path).resolve().relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return Path(path).as_posix()
+
+
 def ground_truth_for(path: str) -> str | None:
     parts = Path(path).parts
     if "test" not in parts:
@@ -131,7 +145,7 @@ with tab_review:
         else:
             reviewed = set(store.latest_per_image())
             hide_done = st.checkbox("Hide already-reviewed images", value=True)
-            pool = [it for it in items if not (hide_done and it[1] in reviewed)]
+            pool = [it for it in items if not (hide_done and review_key(it[1]) in reviewed)]
             if not pool:
                 st.success("Every image in this category has been reviewed.")
             else:
@@ -195,7 +209,7 @@ with tab_review:
         if st.button("Save review", type="primary", width="stretch"):
             store.append(
                 ReviewRecord(
-                    image_path=image_path or "unknown",
+                    image_path=review_key(image_path) or "unknown",
                     category=category,
                     human_verdict=human_verdict,
                     model_score=float(result.image_score),
