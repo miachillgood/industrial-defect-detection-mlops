@@ -161,7 +161,22 @@ def _results_markdown(rows: list[dict], summary: dict, cfg: SpadeConfig) -> str:
         f"**{mp - REFERENCE_MEAN_PIXEL_ROCAUC:+.2f}** |"
     )
     if summary.get("mean_pixel_pro") is not None:
-        lines += ["", f"Mean PRO (extra, not part of the reference table): **{summary['mean_pixel_pro']:.2f} %**"]
+        lines += [
+            "",
+            "## PRO (%)",
+            "",
+            "Per-region overlap, integrated to FPR <= 0.3. Every ground-truth defect "
+            "region counts equally, so a missed small defect costs as much as a missed "
+            "large one -- unlike pixel ROC-AUC, which large defects dominate. The public "
+            "baseline does not report PRO, so there is no reference column.",
+            "",
+            "| category | PRO |",
+            "| --- | ---: |",
+        ]
+        for r in rows:
+            value = r.get("pixel_pro")
+            lines.append(f"| {r['category']} | {'-' if value is None else f'{value:.2f}'} |")
+        lines.append(f"| **Average** | **{summary['mean_pixel_pro']:.2f}** |")
     lines.append("")
     return "\n".join(lines)
 
@@ -230,6 +245,7 @@ def run(cfg: SpadeConfig, run_name: str | None = None, use_mlflow: bool = True,
                     {
                         f"image_rocauc/{category}": row["image_rocauc"],
                         f"pixel_rocauc/{category}": row["pixel_rocauc"],
+                        f"pixel_pro/{category}": row.get("pixel_pro"),
                     }
                 )
     finally:
@@ -267,6 +283,8 @@ def run(cfg: SpadeConfig, run_name: str | None = None, use_mlflow: bool = True,
           f"(reference {REFERENCE_MEAN_IMAGE_ROCAUC})")
     print(f"Average pixel ROCAUC : {summary['mean_pixel_rocauc']:.2f} %  "
           f"(reference {REFERENCE_MEAN_PIXEL_ROCAUC})")
+    if summary.get("mean_pixel_pro") is not None:
+        print(f"Average pixel PRO    : {summary['mean_pixel_pro']:.2f} %  (no public reference)")
     print("=" * 64)
 
     if tracker:
@@ -274,6 +292,7 @@ def run(cfg: SpadeConfig, run_name: str | None = None, use_mlflow: bool = True,
             {
                 "mean_image_rocauc": summary["mean_image_rocauc"],
                 "mean_pixel_rocauc": summary["mean_pixel_rocauc"],
+                "mean_pixel_pro": summary.get("mean_pixel_pro"),
                 "wall_clock_s": summary["wall_clock_s"],
             }
         )
@@ -281,6 +300,23 @@ def run(cfg: SpadeConfig, run_name: str | None = None, use_mlflow: bool = True,
         tracker.end()
 
     return payload
+
+
+def _bool_arg(value: str) -> bool:
+    """Parse a boolean flag that may also be given a value.
+
+    ``--compute-pro`` alone means true; ``--compute-pro false`` is how the DVC
+    pipeline passes ``${evaluate.compute_pro}`` through, since dvc.yaml has no
+    conditionals and must always emit the flag.
+    """
+    if isinstance(value, bool):
+        return value
+    lowered = str(value).strip().lower()
+    if lowered in {"1", "true", "yes", "y", "on"}:
+        return True
+    if lowered in {"0", "false", "no", "n", "off"}:
+        return False
+    raise argparse.ArgumentTypeError(f"expected a boolean, got {value!r}")
 
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -296,7 +332,15 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--output-dir", default="artifacts/runs")
     p.add_argument("--run-name", default=None)
     p.add_argument("--save-visualizations", type=int, default=5)
-    p.add_argument("--compute-pro", action="store_true", help="also compute the PRO metric (slow)")
+    p.add_argument(
+        "--compute-pro",
+        nargs="?",
+        const=True,
+        default=False,
+        type=_bool_arg,
+        metavar="{true,false}",
+        help="also compute the PRO metric; roughly doubles wall-clock time",
+    )
     p.add_argument("--no-mlflow", action="store_true")
     return p.parse_args(argv)
 

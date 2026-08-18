@@ -38,33 +38,54 @@ def render(payload: dict) -> str:
     env = payload.get("environment", {})
 
     mi, mp = summary["mean_image_rocauc"], summary["mean_pixel_rocauc"]
+    pro = summary.get("mean_pixel_pro")
+    # PRO has no public baseline to compare against, so its column stays blank
+    # in the comparison table rather than inviting a bogus delta.
+    pro_head = " PRO |" if pro is not None else ""
+    pro_sep = " ---: |" if pro is not None else ""
     lines = [
         f"MVTec AD 全部 15 类跑通，`K={cfg['top_k']}`、`{cfg['backbone']}`（ImageNet **IMAGENET1K_V1** 权重，全程冻结）：",
         "",
-        "| | 图像级 ROC-AUC | 像素级 ROC-AUC |",
-        "| --- | ---: | ---: |",
-        f"| **本项目（K={cfg['top_k']}）** | **{mi:.2f} %** | **{mp:.2f} %** |",
-        f"| 公开基准 `byungjae89/SPADE-pytorch`（K=5） | {REFERENCE_MEAN_IMAGE_ROCAUC} % | {REFERENCE_MEAN_PIXEL_ROCAUC} % |",
-        f"| 论文基准（K=50） | {PAPER_MEAN_IMAGE_ROCAUC} % | {PAPER_MEAN_PIXEL_ROCAUC} % |",
-        f"| 与公开基准之差 | {mi - REFERENCE_MEAN_IMAGE_ROCAUC:+.2f} | {mp - REFERENCE_MEAN_PIXEL_ROCAUC:+.2f} |",
+        f"| | 图像级 ROC-AUC | 像素级 ROC-AUC |{pro_head}",
+        f"| --- | ---: | ---: |{pro_sep}",
+        f"| **本项目（K={cfg['top_k']}）** | **{mi:.2f} %** | **{mp:.2f} %** |"
+        + (f" **{pro:.2f} %** |" if pro is not None else ""),
+        f"| 公开基准 `byungjae89/SPADE-pytorch`（K=5） | {REFERENCE_MEAN_IMAGE_ROCAUC} % "
+        f"| {REFERENCE_MEAN_PIXEL_ROCAUC} % |" + (" — |" if pro is not None else ""),
+        f"| 论文基准（K=50） | {PAPER_MEAN_IMAGE_ROCAUC} % | {PAPER_MEAN_PIXEL_ROCAUC} % |"
+        + (" — |" if pro is not None else ""),
+        f"| 与公开基准之差 | {mi - REFERENCE_MEAN_IMAGE_ROCAUC:+.2f} "
+        f"| {mp - REFERENCE_MEAN_PIXEL_ROCAUC:+.2f} |" + (" — |" if pro is not None else ""),
         "",
+    ]
+    if pro is not None:
+        lines += [
+            "PRO（per-region overlap，积分到 FPR ≤ 0.3）每个缺陷区域等权，"
+            "不像像素级 ROC-AUC 会被大面积缺陷主导。公开基准与原论文都未报告该指标，故无对照列。",
+            "",
+        ]
+    lines += [
         "<details>",
         "<summary>逐类明细（点开）</summary>",
         "",
-        "| 类别 | 图像级 基准 | 图像级 本项目 | Δ | 像素级 基准 | 像素级 本项目 | Δ |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| 类别 | 图像级 基准 | 图像级 本项目 | Δ | 像素级 基准 | 像素级 本项目 | Δ |"
+        + (" PRO |" if pro is not None else ""),
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |" + (" ---: |" if pro is not None else ""),
     ]
     for r in rows:
         c = r["category"]
         ri, rp = REFERENCE_IMAGE_ROCAUC[c], REFERENCE_PIXEL_ROCAUC[c]
+        row_pro = r.get("pixel_pro")
         lines.append(
             f"| {c} | {ri} | {r['image_rocauc']:.2f} | {r['image_rocauc'] - ri:+.2f} "
             f"| {rp} | {r['pixel_rocauc']:.2f} | {r['pixel_rocauc'] - rp:+.2f} |"
+            + (f" {'—' if row_pro is None else f'{row_pro:.2f}'} |" if pro is not None else "")
         )
     lines += [
         f"| **均值** | **{REFERENCE_MEAN_IMAGE_ROCAUC}** | **{mi:.2f}** "
         f"| **{mi - REFERENCE_MEAN_IMAGE_ROCAUC:+.2f}** | **{REFERENCE_MEAN_PIXEL_ROCAUC}** "
-        f"| **{mp:.2f}** | **{mp - REFERENCE_MEAN_PIXEL_ROCAUC:+.2f}** |",
+        f"| **{mp:.2f}** | **{mp - REFERENCE_MEAN_PIXEL_ROCAUC:+.2f}** |"
+        + (f" **{pro:.2f}** |" if pro is not None else ""),
         "",
         "</details>",
         "",

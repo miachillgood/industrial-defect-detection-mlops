@@ -48,3 +48,26 @@ Reference = `byungjae89/SPADE-pytorch` README (K=5), used as a public baseline. 
 | wood | 95.3 | 95.33 | +0.03 |
 | zipper | 98.6 | 98.59 | -0.01 |
 | **Average** | **96.4** | **96.44** | **+0.04** |
+
+## PRO (%)
+
+Per-region overlap, integrated to FPR <= 0.3. Every ground-truth defect region counts equally, so a missed small defect costs as much as a missed large one -- unlike pixel ROC-AUC, which large defects dominate. The public baseline does not report PRO, so there is no reference column.
+
+| category | PRO |
+| --- | ---: |
+| bottle | 93.33 |
+| cable | 73.51 |
+| capsule | 90.21 |
+| carpet | 80.83 |
+| grid | 86.39 |
+| hazelnut | 93.39 |
+| leather | 97.37 |
+| metal_nut | 86.76 |
+| pill | 91.78 |
+| screw | 93.45 |
+| tile | 69.14 |
+| toothbrush | 91.74 |
+| transistor | 70.76 |
+| wood | 91.66 |
+| zipper | 81.67 |
+| **Average** | **86.13** |

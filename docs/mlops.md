@@ -43,8 +43,8 @@ dvc dag                    # 打印阶段依赖图
 当前仓库里 `dvc metrics show` 的输出：
 
 ```
-Path                                       mean_image_rocauc  mean_pixel_rocauc  n_categories  delta_image_rocauc  delta_pixel_rocauc
-artifacts/runs/full-mvtec-k5/metrics.json  85.41              96.44              15            0.01                0.04
+Path                                       mean_image_rocauc  mean_pixel_rocauc  mean_pixel_pro  n_categories  delta_image_rocauc  delta_pixel_rocauc
+artifacts/runs/full-mvtec-k5/metrics.json  85.41              96.44              86.13           15            0.01                0.04
 ```
 
 ### git 与 DVC 的分工
@@ -65,6 +65,8 @@ artifacts/runs/full-mvtec-k5/metrics.json  85.41              96.44             
 | `build_bank` | `scripts/build_bank.py` | `spade_<category>.pt` + 标定元数据 |
 
 改 `params.yaml` 里的 `evaluate.top_k`（比如从 5 改成论文的 50），`dvc repro` 只会重跑 `evaluate` 和 `build_bank`，不会重新校验数据。
+
+一个 DVC 的实际约束：`dvc.yaml` 的 `cmd` 没有条件语法，`${evaluate.compute_pro}` 只能被无条件展开。所以 `--compute-pro` 被实现成"既能当裸开关、也能带值"（`--compute-pro` / `--compute-pro false`），而不是普通的 `store_true`。这条约束由 `tests/test_cli.py::test_dvc_style_invocation_parses` 锁住。
 
 ### remote
 

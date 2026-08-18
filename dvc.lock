@@ -16,8 +16,8 @@ stages:
       size: 5448
     - path: src/spade
       hash: md5
-      md5: 0019299bbc762ea158282bceea996d33.dir
-      size: 127589
+      md5: 27e6a32f42955196cf85a3cee84b15c6.dir
+      size: 131059
       nfiles: 18
     params:
       params.yaml:
@@ -29,11 +29,11 @@ stages:
     outs:
     - path: artifacts/banks/spade_bottle.json
       hash: md5
-      md5: 0a21712a7195340b5b3aa6a1975a3638
+      md5: e7365ffc5b949aef6030c999b13b8d4d
       size: 623
     - path: artifacts/banks/spade_bottle.pt
       hash: md5
-      md5: 5253fdc08d2d82235bcc61014de42852
+      md5: 97d5888b7311ad677ba33bd974807baa
       size: 588119183
   check_data:
     cmd: python scripts/prepare_data.py --check-only --strict
@@ -50,7 +50,7 @@ stages:
   evaluate:
     cmd: python -m spade.evaluate --categories all --top-k 5 --device auto 
       --batch-size 32 --num-workers 6 --bank-dtype float32 --save-visualizations
-      5 --output-dir artifacts/runs --run-name full-mvtec-k5
+      5 --compute-pro true --output-dir artifacts/runs --run-name full-mvtec-k5
     deps:
     - path: data/mvtec_anomaly_detection
       hash: md5
@@ -59,8 +59,8 @@ stages:
       nfiles: 6642
     - path: src/spade
       hash: md5
-      md5: 0019299bbc762ea158282bceea996d33.dir
-      size: 127589
+      md5: 27e6a32f42955196cf85a3cee84b15c6.dir
+      size: 131059
       nfiles: 18
     params:
       params.yaml:
@@ -72,6 +72,7 @@ stages:
           num_workers: 6
           bank_dtype: float32
           save_visualizations: 5
+          compute_pro: true
           run_name: full-mvtec-k5
     outs:
     - path: artifacts/runs/full-mvtec-k5/config.json
@@ -85,16 +86,16 @@ stages:
       nfiles: 75
     - path: artifacts/runs/full-mvtec-k5/metrics.json
       hash: md5
-      md5: a37999b2b753f6f7667037d6f37ed3bd
-      size: 248
+      md5: cec981a4797493b3d405d1fc09f78925
+      size: 275
     - path: artifacts/runs/full-mvtec-k5/results.json
       hash: md5
-      md5: 904bf71405a9414e71d9fda85d0ae013
-      size: 6719
+      md5: 695ea6ec7f4caad61e7a6c22e3e9a1c4
+      size: 6774
     - path: artifacts/runs/full-mvtec-k5/results.md
       hash: md5
-      md5: 8d2f743b3febd8be73987ff4150d3d07
-      size: 1661
+      md5: dad6f349f3c1facc88caf470cf06842f
+      size: 2312
     - path: artifacts/runs/full-mvtec-k5/roc_curve.png
       hash: md5
       md5: 7a30de6f122c6656c4a402e721cf9c59

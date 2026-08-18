@@ -10,6 +10,9 @@ evaluate:
   num_workers: 6
   bank_dtype: float32
   save_visualizations: 5
+  # PRO (per-region overlap) roughly doubles wall-clock time. On for the
+  # committed pipeline run; `make eval` leaves it off for quick iteration.
+  compute_pro: true
   # Output directory name under artifacts/runs/. Bump it to keep an old run.
   run_name: full-mvtec-k5
 
