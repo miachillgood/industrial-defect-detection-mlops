@@ -12,12 +12,15 @@
     ],
     "top_k": 5,
     "gaussian_sigma": 4.0,
+    "drop_gallery_remainder": false,
     "device": "auto",
     "batch_size": 32,
     "num_workers": 6,
     "gallery_chunk": 4096,
     "bank_dtype": "float32",
     "seed": 42,
+    "cache_features": false,
+    "cache_dir": "artifacts/cache/features",
     "output_dir": "artifacts/runs",
     "save_visualizations": 5,
     "categories": [],
@@ -28,7 +31,7 @@
     "mean_image_rocauc": 85.41,
     "mean_pixel_rocauc": 96.44,
     "mean_pixel_pro": 86.13,
-    "wall_clock_s": 2935.3,
+    "wall_clock_s": 1161.6,
     "reference_mean_image_rocauc": 85.4,
     "reference_mean_pixel_rocauc": 96.4,
     "delta_image_rocauc": 0.01,
@@ -203,79 +206,79 @@
   ],
   "timings": {
     "bottle": {
-      "feature_extraction_s": 134.23,
-      "localization_s": 19.22,
-      "images_per_s_localization": 4.32
+      "feature_extraction_s": 61.45,
+      "localization_s": 4.81,
+      "images_per_s_localization": 17.27
     },
     "cable": {
-      "feature_extraction_s": 219.66,
-      "localization_s": 119.34,
-      "images_per_s_localization": 1.26
+      "feature_extraction_s": 78.08,
+      "localization_s": 9.37,
+      "images_per_s_localization": 16.01
     },
     "capsule": {
-      "feature_extraction_s": 368.52,
-      "localization_s": 61.93,
-      "images_per_s_localization": 2.13
+      "feature_extraction_s": 75.57,
+      "localization_s": 6.47,
+      "images_per_s_localization": 20.41
     },
     "carpet": {
-      "feature_extraction_s": 290.86,
-      "localization_s": 38.52,
-      "images_per_s_localization": 3.04
+      "feature_extraction_s": 72.43,
+      "localization_s": 5.73,
+      "images_per_s_localization": 20.42
     },
     "grid": {
-      "feature_extraction_s": 194.06,
-      "localization_s": 41.47,
-      "images_per_s_localization": 1.88
+      "feature_extraction_s": 61.69,
+      "localization_s": 3.66,
+      "images_per_s_localization": 21.34
     },
     "hazelnut": {
-      "feature_extraction_s": 272.97,
-      "localization_s": 24.82,
-      "images_per_s_localization": 4.43
+      "feature_extraction_s": 73.8,
+      "localization_s": 5.64,
+      "images_per_s_localization": 19.49
     },
     "leather": {
-      "feature_extraction_s": 129.39,
-      "localization_s": 24.52,
-      "images_per_s_localization": 5.06
+      "feature_extraction_s": 67.13,
+      "localization_s": 5.67,
+      "images_per_s_localization": 21.88
     },
     "metal_nut": {
-      "feature_extraction_s": 106.3,
-      "localization_s": 13.15,
-      "images_per_s_localization": 8.75
+      "feature_extraction_s": 66.16,
+      "localization_s": 5.8,
+      "images_per_s_localization": 19.82
     },
     "pill": {
-      "feature_extraction_s": 129.54,
-      "localization_s": 18.48,
-      "images_per_s_localization": 9.04
+      "feature_extraction_s": 81.79,
+      "localization_s": 9.67,
+      "images_per_s_localization": 17.28
     },
     "screw": {
-      "feature_extraction_s": 108.74,
-      "localization_s": 17.33,
-      "images_per_s_localization": 9.23
+      "feature_extraction_s": 77.2,
+      "localization_s": 8.42,
+      "images_per_s_localization": 19.0
     },
     "tile": {
-      "feature_extraction_s": 88.41,
-      "localization_s": 11.31,
-      "images_per_s_localization": 10.34
+      "feature_extraction_s": 68.13,
+      "localization_s": 6.73,
+      "images_per_s_localization": 17.37
     },
     "toothbrush": {
-      "feature_extraction_s": 40.85,
-      "localization_s": 4.92,
-      "images_per_s_localization": 8.53
+      "feature_extraction_s": 31.65,
+      "localization_s": 1.92,
+      "images_per_s_localization": 21.85
     },
     "transistor": {
-      "feature_extraction_s": 87.45,
-      "localization_s": 9.43,
-      "images_per_s_localization": 10.6
+      "feature_extraction_s": 69.67,
+      "localization_s": 5.2,
+      "images_per_s_localization": 19.22
     },
     "wood": {
-      "feature_extraction_s": 85.24,
-      "localization_s": 7.75,
-      "images_per_s_localization": 10.19
+      "feature_extraction_s": 65.97,
+      "localization_s": 3.74,
+      "images_per_s_localization": 21.12
     },
     "zipper": {
-      "feature_extraction_s": 99.31,
-      "localization_s": 15.83,
-      "images_per_s_localization": 9.54
+      "feature_extraction_s": 74.63,
+      "localization_s": 8.01,
+      "images_per_s_localization": 18.86
     }
   },
   "environment": {

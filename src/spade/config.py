@@ -38,10 +38,15 @@ class SpadeConfig:
     layers: tuple[str, ...] = ("layer1", "layer2", "layer3")
 
     # --- SPADE hyper-parameters --------------------------------------------
-    # NOTE: the paper uses K=50; the reference PyTorch implementation we
-    # public baseline uses K=5, and so do we by default.
+    # NOTE: the paper uses K=50; the public baseline implementation we check
+    # against uses K=5, and so do we by default.
     top_k: int = 5
     gaussian_sigma: float = 4.0
+
+    # The baseline iterates ``range(gallery_size // 100)``, silently dropping the
+    # last ``gallery_size % 100`` rows. We use the whole gallery; set this to
+    # True to reproduce that quirk bit-for-bit. See docs/method.md section 3.3.
+    drop_gallery_remainder: bool = False
 
     # --- runtime ------------------------------------------------------------
     device: str = "auto"
@@ -52,6 +57,12 @@ class SpadeConfig:
     gallery_chunk: int = 4096
     bank_dtype: str = "float32"
     seed: int = 42
+
+    # Reuse extracted train features across runs. Off by default: the full
+    # 15-category cache is ~10 GB at float16, ~20 GB at float32. Worth turning on
+    # when sweeping K or sigma, which never change the features.
+    cache_features: bool = False
+    cache_dir: str = "artifacts/cache/features"
 
     # --- outputs ------------------------------------------------------------
     output_dir: str = "artifacts/runs"

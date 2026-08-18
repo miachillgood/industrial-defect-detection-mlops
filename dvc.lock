@@ -16,9 +16,9 @@ stages:
       size: 5448
     - path: src/spade
       hash: md5
-      md5: 27e6a32f42955196cf85a3cee84b15c6.dir
-      size: 131059
-      nfiles: 18
+      md5: c745db31469ff935db23ce9f63212203.dir
+      size: 143371
+      nfiles: 20
     params:
       params.yaml:
         bank:
@@ -29,11 +29,11 @@ stages:
     outs:
     - path: artifacts/banks/spade_bottle.json
       hash: md5
-      md5: e7365ffc5b949aef6030c999b13b8d4d
+      md5: 651eebcd09a86fed3de9957e1ed3aa56
       size: 623
     - path: artifacts/banks/spade_bottle.pt
       hash: md5
-      md5: 97d5888b7311ad677ba33bd974807baa
+      md5: 724119ed7681e78dd3b5b2193c955ed3
       size: 588119183
   check_data:
     cmd: python scripts/prepare_data.py --check-only --strict
@@ -59,9 +59,9 @@ stages:
       nfiles: 6642
     - path: src/spade
       hash: md5
-      md5: 27e6a32f42955196cf85a3cee84b15c6.dir
-      size: 131059
-      nfiles: 18
+      md5: c745db31469ff935db23ce9f63212203.dir
+      size: 143371
+      nfiles: 20
     params:
       params.yaml:
         evaluate:
@@ -77,8 +77,8 @@ stages:
     outs:
     - path: artifacts/runs/full-mvtec-k5/config.json
       hash: md5
-      md5: 05a9cf36762cf7c5219e0ad32c4f38ee
-      size: 453
+      md5: 3be056a0b3ef2bd9b18016e49ab1305f
+      size: 558
     - path: artifacts/runs/full-mvtec-k5/images
       hash: md5
       md5: dac09677679257d73da77239f2604127.dir
@@ -86,12 +86,12 @@ stages:
       nfiles: 75
     - path: artifacts/runs/full-mvtec-k5/metrics.json
       hash: md5
-      md5: cec981a4797493b3d405d1fc09f78925
+      md5: 961975a311faf60ea0c94718fc32eaa4
       size: 275
     - path: artifacts/runs/full-mvtec-k5/results.json
       hash: md5
-      md5: 695ea6ec7f4caad61e7a6c22e3e9a1c4
-      size: 6774
+      md5: 77d41f043c41d467fc7749c48902b7c9
+      size: 6871
     - path: artifacts/runs/full-mvtec-k5/results.md
       hash: md5
       md5: dad6f349f3c1facc88caf470cf06842f

@@ -18,6 +18,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
+from .cache import FeatureCache, cache_key
 from .config import SpadeConfig
 from .data import CLASS_NAMES, MVTecDataset, resolve_root
 from .features import PyramidFeatureExtractor, extract_features
@@ -51,7 +52,7 @@ def evaluate_category(
     cfg: SpadeConfig,
     extractor: PyramidFeatureExtractor,
     out_dir: Path,
-    compute_pro: bool = False,
+    compute_pro: bool = True,
 ) -> tuple[CategoryMetrics, dict]:
     device = cfg.resolved_device()
     bank_dtype = getattr(torch, cfg.bank_dtype)
@@ -60,10 +61,25 @@ def evaluate_category(
     test_ds = MVTecDataset(cfg.data_root, category, is_train=False, resize=cfg.resize, cropsize=cfg.cropsize)
 
     t0 = time.perf_counter()
-    train_features, _, _, _ = extract_features(
-        extractor, _loader(train_ds, cfg), dtype=bank_dtype,
-        progress_desc=f"[{category}] train features",
+
+    # Only the train split is cached -- the same choice the public baseline
+    # makes. It is 3 629 of the 5 354 images, and caching the test split would
+    # also mean storing the input tensors the localisation figures need.
+    cache = FeatureCache(cfg.cache_dir, enabled=cfg.cache_features)
+    key = cache_key(
+        category, "train", cfg.backbone, cfg.layers, cfg.resize, cfg.cropsize, cfg.bank_dtype
     )
+    cached = cache.load(key)
+    if cached is not None:
+        train_features, _, _ = cached
+        print(f"  [{category}] train features from cache ({cache.path_for(key).name})")
+    else:
+        train_features, train_labels, train_masks, _ = extract_features(
+            extractor, _loader(train_ds, cfg), dtype=bank_dtype,
+            progress_desc=f"[{category}] train features",
+        )
+        cache.save(key, train_features, train_labels, train_masks)
+
     test_features, test_labels, test_masks, test_images = extract_features(
         extractor, _loader(test_ds, cfg), dtype=bank_dtype,
         progress_desc=f"[{category}] test features", collect_inputs=True,
@@ -77,6 +93,7 @@ def evaluate_category(
         gaussian_sigma=cfg.gaussian_sigma,
         gallery_chunk=cfg.gallery_chunk,
         device=device,
+        drop_gallery_remainder=cfg.drop_gallery_remainder,
     ).fit(train_features)
 
     t1 = time.perf_counter()
@@ -182,7 +199,7 @@ def _results_markdown(rows: list[dict], summary: dict, cfg: SpadeConfig) -> str:
 
 
 def run(cfg: SpadeConfig, run_name: str | None = None, use_mlflow: bool = True,
-        compute_pro: bool = False) -> dict:
+        compute_pro: bool = True) -> dict:
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
 
@@ -333,13 +350,34 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--run-name", default=None)
     p.add_argument("--save-visualizations", type=int, default=5)
     p.add_argument(
-        "--compute-pro",
+        "--cache-features",
         nargs="?",
         const=True,
         default=False,
         type=_bool_arg,
         metavar="{true,false}",
-        help="also compute the PRO metric; roughly doubles wall-clock time",
+        help="reuse extracted train features across runs (~10 GB for all 15 categories)",
+    )
+    p.add_argument("--cache-dir", default="artifacts/cache/features")
+    p.add_argument(
+        "--drop-gallery-remainder",
+        nargs="?",
+        const=True,
+        default=False,
+        type=_bool_arg,
+        metavar="{true,false}",
+        help="reproduce the public baseline's integer-division gallery truncation "
+             "(it drops the last gallery_size %% 100 rows)",
+    )
+    p.add_argument(
+        "--compute-pro",
+        nargs="?",
+        const=True,
+        default=True,
+        type=_bool_arg,
+        metavar="{true,false}",
+        help="compute the PRO metric (default on; measured at ~18 s across all 15 "
+             "categories, ~2 %% of a run -- pass false to skip it)",
     )
     p.add_argument("--no-mlflow", action="store_true")
     return p.parse_args(argv)
@@ -360,6 +398,9 @@ def main(argv=None) -> None:
         bank_dtype=args.bank_dtype,
         output_dir=args.output_dir,
         save_visualizations=args.save_visualizations,
+        drop_gallery_remainder=args.drop_gallery_remainder,
+        cache_features=args.cache_features,
+        cache_dir=args.cache_dir,
         categories=categories,
     )
     run(cfg, run_name=args.run_name, use_mlflow=not args.no_mlflow, compute_pro=args.compute_pro)

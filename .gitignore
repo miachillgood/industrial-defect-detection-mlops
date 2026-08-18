@@ -12,6 +12,10 @@
 /artifacts/runs/*/temp/
 /artifacts/*.log
 
+# Extracted backbone features: ~20 GB at float32 for all 15 categories, and
+# fully regenerable from the dataset. Never git, never DVC.
+/artifacts/cache/
+
 # Human review decisions are per-deployment runtime data, not source.
 /artifacts/reviews/*.jsonl
 /artifacts/reviews/*.csv

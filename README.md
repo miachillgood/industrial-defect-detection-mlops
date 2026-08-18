@@ -70,6 +70,7 @@ score(x) = mean( topK_min ‖ f_avg(x) − f_avg(t_i) ‖₂ ,  t_i ∈ 正常�
 ## 结果
 
 <!-- RESULTS:BEGIN -->
+<!-- source: artifacts/runs/full-mvtec-k5/results.json -->
 MVTec AD 全部 15 类跑通，`K=5`、`wide_resnet50_2`（ImageNet **IMAGENET1K_V1** 权重，全程冻结）：
 
 | | 图像级 ROC-AUC | 像素级 ROC-AUC | PRO |
@@ -105,7 +106,7 @@ PRO（per-region overlap，积分到 FPR ≤ 0.3）每个缺陷区域等权，�
 
 </details>
 
-> 运行环境：macOS-26.5.2-arm64-arm-64bit-Mach-O，PyTorch 2.13.0，设备 `mps`，全程耗时 48.9 分钟。
+> 运行环境：macOS-26.5.2-arm64-arm-64bit-Mach-O，PyTorch 2.13.0，设备 `mps`，全程耗时 19.4 分钟。
 > 本方法不训练也不采样，同一环境下重复运行结果完全一致。
 
 `grid` 的图像级 47 % 低于随机——这不是 bug，是这套方法的已知短板，公开基准同样是 47.3 %；详见 [docs/method.md](docs/method.md#6-已知的正常波动)。
@@ -226,9 +227,9 @@ docs/                 方法细节、工程层说明
 
 ---
 
-## 我踩过并显式处理掉的三个坑
+## 我踩过并显式处理掉的四个坑
 
-完整清单见 [docs/method.md](docs/method.md)，这里是最关键的三条：
+完整清单见 [docs/method.md](docs/method.md)，这里是最关键的四条：
 
 1. **`torch.pairwise_distance` 的归约轴在 PyTorch 2.x 变了。**
    PyTorch 1.x 上它沿 `dim=1`（通道维）归约，≥ 2.0 改为沿**最后一维**——同一行代码在新版上会**静默**算出含义完全不同的量，而且不报错。我显式沿通道维计算，并用 `tests/test_model.py::test_channelwise_reduction_is_the_intended_distance` 把语义锁死，防止后来的人"顺手简化"回内置函数。
@@ -239,11 +240,16 @@ docs/                 方法细节、工程层说明
 3. **`Image.ANTIALIAS` 实际是 LANCZOS，不是 bilinear。**
    预处理里的 `Resize(256)` 必须用 LANCZOS 重采样，换成默认的 bilinear 会系统性地改变结果。
 
+4. **公开基准的 gallery 遍历用整除，会静默丢掉尾部。**
+   `range(gallery_size // 100)` 丢掉最后 `G % 100` 行（K=5 时 layer1 丢 80/15 680）。我默认用完整 gallery，但没有停在"推理它影响很小"——两种模式都在 15 类上跑了完整一遍：打开丢尾后像素级均值正好是基准公布的 **96.40**，逐类平均绝对偏差从 0.042 减半到 0.021，我原先偏差最大的 `transistor`（0.15）降到 0.02。**所以那 0.15 主要不是浮点噪声，而是这个 quirk。** 图像级完全不受影响（分数来自 avgpool，不经过 gallery）。
+
+   默认仍保持完整 gallery——更贴近基准数字不等于更正确，那 0.04 是被复刻的实现缺陷。`--drop-gallery-remainder` 的作用是让差异来源可审计，不是拿来刷分。两次运行的完整结果都在 `artifacts/runs/` 下。
+
 ---
 
 ## 文档
 
-- [docs/method.md](docs/method.md) — 方法与实现细节：两阶段算法、逐项配置核对表、三个坑、指标定义、已知波动、运行环境
+- [docs/method.md](docs/method.md) — 方法与实现细节：两阶段算法、逐项配置核对表、四个坑与丢尾实测对照、指标定义、已知波动、运行环境
 - [docs/mlops.md](docs/mlops.md) — 工程层：DVC 流水线、MLflow 记录、FastAPI/Streamlit 设计取舍、Docker 与 CI
 
 ---

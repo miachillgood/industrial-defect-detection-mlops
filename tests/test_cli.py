@@ -16,7 +16,9 @@ from spade.evaluate import _bool_arg, parse_args
 
 def test_defaults():
     args = parse_args([])
-    assert args.compute_pro is False
+    # PRO is on by default: measured at ~18 s across all 15 categories (~2 % of a
+    # run), so there is no cost worth trading the extra metric for.
+    assert args.compute_pro is True
     assert args.top_k == 5
     assert args.categories == "all"
     assert args.device == "auto"

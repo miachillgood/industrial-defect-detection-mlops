@@ -47,6 +47,37 @@ Path                                       mean_image_rocauc  mean_pixel_rocauc 
 artifacts/runs/full-mvtec-k5/metrics.json  85.41              96.44              86.13           15            0.01                0.04
 ```
 
+### 特征缓存：DVC 管不到的那一层
+
+DVC 的缓存粒度是**阶段**。改 `params.yaml` 里的 `top_k`，整个 `evaluate` 阶段重跑——包括那 15 分钟的特征提取。但特征只取决于（数据集、骨干、预处理），**跟 K 和 sigma 毫无关系**。扫一遍 K 就白白重算十几次完全相同的张量。
+
+所以另加了一层阶段内缓存（`src/spade/cache.py`，默认关闭）：
+
+```bash
+python -m spade.evaluate --categories all --cache-features
+```
+
+实测 toothbrush 第二遍命中缓存，结果完全相同，特征耗时 56s → 20s（剩下的 20s 是未缓存的测试集）。
+
+两个设计选择：
+
+- **只缓存训练集**，和参考实现一样。训练集是 5 354 张里的 3 629 张，占大头；而缓存测试集还要连输入张量一起存（定位可视化需要），不划算。
+- **缓存键覆盖所有能改变张量的因素**：类别、split、骨干、层集合、resize/crop、dtype、**torch 版本**。参考实现只用类名做键——改一下输入尺寸，它就会静默返回错误尺寸的特征。这条由 `tests/test_cache.py::test_every_input_dimension_changes_the_key` 锁住。
+
+缓存全量约 20 GB（float32），已在 `.gitignore` 里，也不进 DVC——它完全可以从数据集重新生成，没有版本化的价值。
+
+### README 结果表的自校验有个坑
+
+README 的结果表由 `scripts/update_readme_results.py` 从 `results.json` 生成，CI 会用 `--check` 复核。最初 `--check` 的实现是"取 `artifacts/` 下 mtime 最新的 `results.json`"——加进第二个运行目录（丢尾对照实验）的当天就炸了：它去和消融实验对比，然后把完全正确的 README 报成 stale。
+
+改成在结果块里写一行来源标记：
+
+```html
+<!-- source: artifacts/runs/full-mvtec-k5/results.json -->
+```
+
+`--check` 读这一行来决定跟谁比，README 因此自描述。回归测试 `tests/test_readme_sync.py::test_check_uses_the_declared_run_not_the_newest` 会同时验证"有标记时正确"和"去掉标记后确实会误报"，保证这个守卫不是摆设。
+
 ### git 与 DVC 的分工
 
 `dvc.yaml` 里用 `cache: false` 明确划线：

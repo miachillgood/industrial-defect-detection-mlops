@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -99,7 +100,25 @@ def render(payload: dict) -> str:
     return "\n".join(lines)
 
 
-def latest_results() -> Path:
+def source_marker(results_path: Path) -> str:
+    rel = results_path.resolve().relative_to(REPO_ROOT).as_posix()
+    return f"<!-- source: {rel} -->"
+
+
+def declared_source(text: str) -> Path | None:
+    """The run the README block was generated from, as recorded in the block.
+
+    Without this, ``--check`` had to guess -- it picked the most recently
+    modified ``results.json`` anywhere under ``artifacts/``. The moment a second
+    run exists (say an ablation), the guess silently switches to the wrong run
+    and CI fails with "README is stale" while the README is in fact correct.
+    """
+    match = re.search(r"<!--\s*source:\s*(\S+?)\s*-->", text)
+    return REPO_ROOT / match.group(1) if match else None
+
+
+def fallback_results() -> Path:
+    """Only used to bootstrap a README that has no source marker yet."""
     candidates = sorted(
         (REPO_ROOT / "artifacts").glob("**/results.json"),
         key=lambda p: p.stat().st_mtime,
@@ -117,7 +136,21 @@ def main() -> None:
     p.add_argument("--check", action="store_true", help="exit 1 if the README is out of date")
     args = p.parse_args()
 
-    results_path = Path(args.results) if args.results else latest_results()
+    readme_path = Path(args.readme)
+    text = readme_path.read_text(encoding="utf-8")
+    if BEGIN not in text or END not in text:
+        raise SystemExit(f"{readme_path} is missing the {BEGIN} / {END} markers")
+
+    if args.results:
+        results_path = Path(args.results)
+    else:
+        results_path = declared_source(text) or fallback_results()
+    if not results_path.exists():
+        raise SystemExit(
+            f"{readme_path.name} points at {results_path}, which does not exist. "
+            "Re-run the pipeline, or regenerate against a run that does."
+        )
+
     payload = json.loads(results_path.read_text(encoding="utf-8"))
     if len(payload["per_category"]) != 15:
         raise SystemExit(
@@ -125,14 +158,9 @@ def main() -> None:
             "the README table needs a full 15-category run"
         )
 
-    readme_path = Path(args.readme)
-    text = readme_path.read_text(encoding="utf-8")
-    if BEGIN not in text or END not in text:
-        raise SystemExit(f"{readme_path} is missing the {BEGIN} / {END} markers")
-
     head, rest = text.split(BEGIN, 1)
     _, tail = rest.split(END, 1)
-    updated = f"{head}{BEGIN}\n{render(payload)}\n{END}{tail}"
+    updated = f"{head}{BEGIN}\n{source_marker(results_path)}\n{render(payload)}\n{END}{tail}"
 
     if args.check:
         if updated != text:
