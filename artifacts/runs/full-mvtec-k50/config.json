@@ -1,0 +1,26 @@
+{
+  "data_root": "data/mvtec_anomaly_detection",
+  "resize": 256,
+  "cropsize": 224,
+  "backbone": "wide_resnet50_2",
+  "layers": [
+    "layer1",
+    "layer2",
+    "layer3"
+  ],
+  "top_k": 50,
+  "gaussian_sigma": 4.0,
+  "drop_gallery_remainder": false,
+  "device": "mps",
+  "batch_size": 32,
+  "num_workers": 6,
+  "gallery_chunk": 4096,
+  "bank_dtype": "float32",
+  "seed": 42,
+  "cache_features": false,
+  "cache_dir": "artifacts/cache/features",
+  "output_dir": "artifacts/runs",
+  "save_visualizations": 0,
+  "categories": [],
+  "resolved_device": "mps"
+}

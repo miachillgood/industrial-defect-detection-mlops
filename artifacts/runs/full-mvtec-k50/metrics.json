@@ -1,0 +1,11 @@
+{
+  "n_categories": 15,
+  "mean_image_rocauc": 80.88,
+  "mean_pixel_rocauc": 96.98,
+  "mean_pixel_pro": 83.87,
+  "wall_clock_s": 5467.5,
+  "reference_mean_image_rocauc": 85.4,
+  "reference_mean_pixel_rocauc": 96.4,
+  "delta_image_rocauc": -4.52,
+  "delta_pixel_rocauc": 0.58
+}

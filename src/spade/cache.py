@@ -13,7 +13,9 @@ Differences from the baseline's version:
   so a stale cache cannot silently poison a run -- the baseline keys on the
   class name alone, which goes wrong the moment you change the input size;
 * ``torch.save`` instead of ``pickle``, and off by default, because the full
-  15-category train cache is ~10 GB at float16.
+  15-category train cache is 19.0 GB at float32 (9.5 GB at float16): one image's
+  four hooked layers are ``256*56^2 + 512*28^2 + 1024*14^2 + 2048`` numbers,
+  about 5.37 MB, times 3 629 training images.
 """
 
 from __future__ import annotations

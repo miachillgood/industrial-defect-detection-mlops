@@ -59,7 +59,7 @@ class SpadeConfig:
     seed: int = 42
 
     # Reuse extracted train features across runs. Off by default: the full
-    # 15-category cache is ~10 GB at float16, ~20 GB at float32. Worth turning on
+    # 15-category cache is 19.0 GB at float32, 9.5 GB at float16. Worth turning on
     # when sweeping K or sigma, which never change the features.
     cache_features: bool = False
     cache_dir: str = "artifacts/cache/features"

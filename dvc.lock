@@ -16,8 +16,8 @@ stages:
       size: 5448
     - path: src/spade
       hash: md5
-      md5: c745db31469ff935db23ce9f63212203.dir
-      size: 143371
+      md5: 3b789a0467c75d4bf00486fdfd41cd3d.dir
+      size: 143684
       nfiles: 20
     params:
       params.yaml:
@@ -59,8 +59,8 @@ stages:
       nfiles: 6642
     - path: src/spade
       hash: md5
-      md5: c745db31469ff935db23ce9f63212203.dir
-      size: 143371
+      md5: 3b789a0467c75d4bf00486fdfd41cd3d.dir
+      size: 143684
       nfiles: 20
     params:
       params.yaml:
