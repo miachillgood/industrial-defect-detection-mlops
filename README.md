@@ -40,6 +40,7 @@ Three engineering consequences follow directly from that choice:
 | **Human-in-the-loop** | Streamlit review console, append-only JSONL decisions, live view of how the threshold changes verdicts |
 | **Delivery** | Multi-stage Dockerfile (CPU-only torch, non-root, baked-in weights) + docker-compose |
 | **CI** | ruff, a Python 3.11/3.12 test matrix, API image smoke test |
+| **Tests** | 141 tests, 97 % line coverage over `src/`, all runnable without the 5 GB dataset |
 
 The dataset is [MVTec Anomaly Detection (MVTec AD)](https://www.mvtec.com/company/research/datasets/mvtec-ad): 15 categories of industrial products and materials, 3 629 training images + 1 725 test images.
 

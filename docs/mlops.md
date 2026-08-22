@@ -274,6 +274,23 @@ The `image:` keys in `docker-compose.yml` (`spade-api:local`, `spade-review:loca
 
 CI has no 5 GB dataset, so tests that need it are marked `needs_data` and skipped; tests that need the backbone are marked `needs_backbone` and get their weights from the cache.
 
+### The test suite
+
+141 tests, 97 % line coverage over `src/`. The coverage number is not the point — where it was *missing* was:
+
+| Module | Before | After | What was untested |
+| --- | ---: | ---: | --- |
+| `mlops/tracking.py` | 0 % | 100 % | the entire MLflow wrapper, including the fail-soft contract |
+| `spade/evaluate.py` | 29 % | 93 % | `run()` and `evaluate_category()` — what `make eval` and DVC actually call |
+| `spade/config.py` | 67 % | 96 % | config save/load roundtrip |
+| `spade/features.py` | 60 % | 98 % | `extract_features` over a real dataloader |
+
+Two of those are uncomfortable in hindsight: **"a tracking failure never breaks a run" is asserted throughout this documentation and had no test at all**, and the orchestration layer that every entry point goes through was the least covered module in the project.
+
+Both are covered now. `tests/test_evaluate.py::test_run_survives_a_broken_tracker` substitutes a `MlflowTracker` that raises on construction and asserts the run still completes and writes `results.json` — the exact failure mode that happened for real when MLflow 3.15 started rejecting the file store.
+
+`tests/test_evaluate.py` drives the whole pipeline over a synthetic MVTec-shaped tree (6 train / 6 test images of generated noise, with a bright patch as the injected defect), so dataset indexing, feature extraction, scoring, metrics, figures, and report generation are all exercised without the real 5 GB dataset — which is also what makes them runnable in CI.
+
 `tests/test_docs_attribution.py` turns the attribution requirements into tests that can fail: the README must mention the paper, the authors, `byungjae89/SPADE-pytorch`, the `NVlabs/SPADE` disambiguation, and the difference between `K=5` and `K=50`. If any document describes the third-party implementation as a release by the paper's authors, CI goes red.
 
 That check comes with a guard for the guard: `test_the_attribution_guard_actually_catches_a_bare_claim` ensures the regexes have not been loosened. Documents are allowed to **quote** the wrong phrasing as a warning (detected via negation cues in the surrounding context), but not to assert it.
