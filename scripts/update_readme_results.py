@@ -45,31 +45,33 @@ def render(payload: dict) -> str:
     pro_head = " PRO |" if pro is not None else ""
     pro_sep = " ---: |" if pro is not None else ""
     lines = [
-        f"MVTec AD 全部 15 类跑通，`K={cfg['top_k']}`、`{cfg['backbone']}`（ImageNet **IMAGENET1K_V1** 权重，全程冻结）：",
+        f"All 15 MVTec AD categories, `K={cfg['top_k']}`, `{cfg['backbone']}` "
+        "(ImageNet **IMAGENET1K_V1** weights, frozen throughout):",
         "",
-        f"| | 图像级 ROC-AUC | 像素级 ROC-AUC |{pro_head}",
+        f"| | Image ROC-AUC | Pixel ROC-AUC |{pro_head}",
         f"| --- | ---: | ---: |{pro_sep}",
-        f"| **本项目（K={cfg['top_k']}）** | **{mi:.2f} %** | **{mp:.2f} %** |"
+        f"| **This project (K={cfg['top_k']})** | **{mi:.2f} %** | **{mp:.2f} %** |"
         + (f" **{pro:.2f} %** |" if pro is not None else ""),
-        f"| 公开基准 `byungjae89/SPADE-pytorch`（K=5） | {REFERENCE_MEAN_IMAGE_ROCAUC} % "
+        f"| Public baseline `byungjae89/SPADE-pytorch` (K=5) | {REFERENCE_MEAN_IMAGE_ROCAUC} % "
         f"| {REFERENCE_MEAN_PIXEL_ROCAUC} % |" + (" — |" if pro is not None else ""),
-        f"| 论文基准（K=50） | {PAPER_MEAN_IMAGE_ROCAUC} % | {PAPER_MEAN_PIXEL_ROCAUC} % |"
+        f"| Paper (K=50) | {PAPER_MEAN_IMAGE_ROCAUC} % | {PAPER_MEAN_PIXEL_ROCAUC} % |"
         + (" — |" if pro is not None else ""),
-        f"| 与公开基准之差 | {mi - REFERENCE_MEAN_IMAGE_ROCAUC:+.2f} "
+        f"| Delta vs. public baseline | {mi - REFERENCE_MEAN_IMAGE_ROCAUC:+.2f} "
         f"| {mp - REFERENCE_MEAN_PIXEL_ROCAUC:+.2f} |" + (" — |" if pro is not None else ""),
         "",
     ]
     if pro is not None:
         lines += [
-            "PRO（per-region overlap，积分到 FPR ≤ 0.3）每个缺陷区域等权，"
-            "不像像素级 ROC-AUC 会被大面积缺陷主导。公开基准与原论文都未报告该指标，故无对照列。",
+            "PRO (per-region overlap, integrated to FPR <= 0.3) weights every defect region "
+            "equally, unlike pixel ROC-AUC which large defects dominate. Neither the public "
+            "baseline nor the paper reports it, so there is no reference column.",
             "",
         ]
     lines += [
         "<details>",
-        "<summary>逐类明细（点开）</summary>",
+        "<summary>Per-category detail (click to expand)</summary>",
         "",
-        "| 类别 | 图像级 基准 | 图像级 本项目 | Δ | 像素级 基准 | 像素级 本项目 | Δ |"
+        "| category | image (baseline) | image (ours) | Δ | pixel (baseline) | pixel (ours) | Δ |"
         + (" PRO |" if pro is not None else ""),
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: |" + (" ---: |" if pro is not None else ""),
     ]
@@ -83,19 +85,22 @@ def render(payload: dict) -> str:
             + (f" {'—' if row_pro is None else f'{row_pro:.2f}'} |" if pro is not None else "")
         )
     lines += [
-        f"| **均值** | **{REFERENCE_MEAN_IMAGE_ROCAUC}** | **{mi:.2f}** "
+        f"| **Mean** | **{REFERENCE_MEAN_IMAGE_ROCAUC}** | **{mi:.2f}** "
         f"| **{mi - REFERENCE_MEAN_IMAGE_ROCAUC:+.2f}** | **{REFERENCE_MEAN_PIXEL_ROCAUC}** "
         f"| **{mp:.2f}** | **{mp - REFERENCE_MEAN_PIXEL_ROCAUC:+.2f}** |"
         + (f" **{pro:.2f}** |" if pro is not None else ""),
         "",
         "</details>",
         "",
-        f"> 运行环境：{env.get('platform', 'n/a')}，PyTorch {env.get('torch', 'n/a')}，"
-        f"设备 `{cfg.get('resolved_device', 'n/a')}`，全程耗时 {summary.get('wall_clock_s', 0) / 60:.1f} 分钟。",
-        "> 本方法不训练也不采样，同一环境下重复运行结果完全一致。",
+        f"> Environment: {env.get('platform', 'n/a')}, PyTorch {env.get('torch', 'n/a')}, "
+        f"device `{cfg.get('resolved_device', 'n/a')}`, "
+        f"{summary.get('wall_clock_s', 0) / 60:.1f} min end to end.",
+        "> The method neither trains nor samples, so repeated runs in the same environment "
+        "are bit-for-bit identical.",
         "",
-        "`grid` 的图像级 47 % 低于随机——这不是 bug，是这套方法的已知短板，公开基准同样是 47.3 %；"
-        "详见 [docs/method.md](docs/method.md#6-已知的正常波动)。",
+        "`grid` scores 47 % at image level -- below chance. That is not a bug but a known "
+        "weakness of the method; the public baseline reports 47.3 % too. See "
+        "[docs/method.md](docs/method.md#6-已知的正常波动).",
     ]
     return "\n".join(lines)
 
