@@ -61,8 +61,8 @@ Measured: toothbrush hit the cache on a second run with identical results, and f
 
 Two design choices:
 
-- **Only the train split is cached**, the same choice the public baseline makes. Training is 3 629 of the 5 354 images, the bulk of it; caching the test split would also mean storing the input tensors the localisation figures need, which is not worth it.
-- **The cache key covers everything that can change the tensors**: category, split, backbone, layer set, resize/crop, dtype, and the **torch version**. The baseline keys on the class name alone — change the input size and it silently returns features of the wrong shape. `tests/test_cache.py::test_every_input_dimension_changes_the_key` pins this.
+- **Only the train split is cached.** Training is 3 629 of the 5 354 images, the bulk of it; caching the test split would also mean storing the input tensors the localisation figures need, which is not worth it.
+- **The cache key covers everything that can change the tensors**: category, split, backbone, layer set, resize/crop, dtype, and the **torch version**. Keying on the category name alone is the tempting shortcut, and it silently returns features of the wrong shape the moment the input size changes. `tests/test_cache.py::test_every_input_dimension_changes_the_key` pins this.
 
 The cache size can be computed directly: one training image's four hooked layers at float32 is `256·56² + 512·28² + 1024·14² + 2048` numbers ≈ 5.37 MB, so 3 629 training images total **19.0 GB** (halved to 9.5 GB at float16). Measured: toothbrush's 60 images take 329 MB against the 322 MB computed (the gap is `torch.save` overhead plus labels/masks).
 
@@ -97,7 +97,7 @@ The fix writes a source marker into the result block:
 | `evaluate` | `python -m spade.evaluate` | `results.json` / `results.md` / `metrics.json` / `roc_curve.png` / `images/` |
 | `build_bank` | `scripts/build_bank.py` | `spade_<category>.pt` + calibration metadata |
 
-Change `evaluate.top_k` in `params.yaml` (say from 5 to the paper's 50) and `dvc repro` re-runs only `evaluate` and `build_bank`, not the data verification.
+Change `evaluate.top_k` in `params.yaml` (say from 5 to 50) and `dvc repro` re-runs only `evaluate` and `build_bank`, not the data verification.
 
 One practical DVC constraint: `dvc.yaml`'s `cmd` has no conditional syntax, so `${evaluate.compute_pro}` can only be expanded unconditionally. That is why `--compute-pro` is implemented to work **both as a bare flag and with a value** (`--compute-pro` / `--compute-pro false`) rather than as a plain `store_true`. `tests/test_cli.py::test_dvc_style_invocation_parses` pins the constraint.
 
@@ -291,6 +291,6 @@ Both are covered now. `tests/test_evaluate.py::test_run_survives_a_broken_tracke
 
 `tests/test_evaluate.py` drives the whole pipeline over a synthetic MVTec-shaped tree (6 train / 6 test images of generated noise, with a bright patch as the injected defect), so dataset indexing, feature extraction, scoring, metrics, figures, and report generation are all exercised without the real 5 GB dataset — which is also what makes them runnable in CI.
 
-`tests/test_docs_attribution.py` turns the attribution requirements into tests that can fail: the README must mention the paper, the authors, `byungjae89/SPADE-pytorch`, the `NVlabs/SPADE` disambiguation, and the difference between `K=5` and `K=50`. If any document describes the third-party implementation as a release by the paper's authors, CI goes red.
+`tests/test_docs_attribution.py` turns the credit requirements into tests that can fail: the README must keep the method citation and the `NVlabs/SPADE` disambiguation. If any document describes `byungjae89/SPADE-pytorch` as code released by the method's authors, CI goes red — it is a third-party implementation, and no public repository from the authors was found.
 
 That check comes with a guard for the guard: `test_the_attribution_guard_actually_catches_a_bare_claim` ensures the regexes have not been loosened. Documents are allowed to **quote** the wrong phrasing as a warning (detected via negation cues in the surrounding context), but not to assert it.

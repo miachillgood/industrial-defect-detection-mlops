@@ -69,16 +69,24 @@ def test_source_marker_roundtrips():
 
 
 def test_render_includes_pro_column_only_when_present():
+    """The PRO column appears only when the run actually computed PRO.
+
+    Matching on the table header rather than the bare word "PRO", because the
+    closing note about `grid` mentions PRO unconditionally.
+    """
     with_pro = mod.render(_payload(pro=86.13))
     without_pro = mod.render(_payload(pro=None))
-    assert "PRO" in with_pro and "86.13" in with_pro
-    assert "PRO" not in without_pro
+    assert "| Image ROC-AUC | Pixel ROC-AUC | PRO |" in with_pro
+    assert "86.13" in with_pro
+    assert "| Image ROC-AUC | Pixel ROC-AUC |" in without_pro
+    assert "| Image ROC-AUC | Pixel ROC-AUC | PRO |" not in without_pro
 
 
-def test_render_marks_pro_as_having_no_baseline():
-    """A delta against a baseline that never published PRO would be fiction."""
-    text = mod.render(_payload(pro=86.13))
-    assert "—" in text
+def test_render_uses_an_em_dash_for_a_category_missing_pro():
+    """A partial run can leave one category without a PRO value."""
+    payload = _payload(pro=86.13)
+    payload["per_category"][0].pop("pixel_pro")
+    assert "| —" in mod.render(payload)
 
 
 def test_check_uses_the_declared_run_not_the_newest(tmp_path, monkeypatch, capsys):

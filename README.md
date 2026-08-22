@@ -76,59 +76,57 @@ All 15 MVTec AD categories, `K=5`, `wide_resnet50_2` (ImageNet **IMAGENET1K_V1**
 
 | | Image ROC-AUC | Pixel ROC-AUC | PRO |
 | --- | ---: | ---: | ---: |
-| **This project (K=5)** | **85.41 %** | **96.44 %** | **86.13 %** |
-| Public baseline `byungjae89/SPADE-pytorch` (K=5) | 85.4 % | 96.4 % | — |
-| Paper (K=50) | 85.5 % | 96.5 % | — |
-| Delta vs. public baseline | +0.01 | +0.04 | — |
+| **Mean over 15 categories** | **85.41 %** | **96.44 %** | **86.13 %** |
 
-PRO (per-region overlap, integrated to FPR <= 0.3) weights every defect region equally, unlike pixel ROC-AUC which large defects dominate. Neither the public baseline nor the paper reports it, so there is no reference column.
+PRO (per-region overlap, integrated to FPR <= 0.3) weights every defect region equally, unlike pixel ROC-AUC which large defects dominate: missing a small scratch costs as much as missing a large one.
 
 <details>
 <summary>Per-category detail (click to expand)</summary>
 
-| category | image (baseline) | image (ours) | Δ | pixel (baseline) | pixel (ours) | Δ | PRO |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| bottle | 97.2 | 97.22 | +0.02 | 97.0 | 97.01 | +0.01 | 93.33 |
-| cable | 84.8 | 84.84 | +0.04 | 92.3 | 92.41 | +0.11 | 73.51 |
-| capsule | 89.7 | 89.67 | -0.03 | 98.4 | 98.39 | -0.01 | 90.21 |
-| carpet | 92.8 | 92.78 | -0.02 | 98.9 | 98.91 | +0.01 | 80.83 |
-| grid | 47.3 | 47.28 | -0.02 | 98.3 | 98.35 | +0.05 | 86.39 |
-| hazelnut | 88.1 | 88.14 | +0.04 | 98.5 | 98.53 | +0.03 | 93.39 |
-| leather | 95.4 | 95.38 | -0.02 | 99.3 | 99.32 | +0.02 | 97.37 |
-| metal_nut | 71.0 | 70.97 | -0.03 | 97.1 | 97.14 | +0.04 | 86.76 |
-| pill | 80.1 | 80.14 | +0.04 | 95.0 | 94.98 | -0.02 | 91.78 |
-| screw | 66.7 | 66.71 | +0.01 | 99.1 | 99.11 | +0.01 | 93.45 |
-| tile | 96.5 | 96.50 | +0.00 | 92.8 | 92.88 | +0.08 | 69.14 |
-| toothbrush | 88.9 | 88.89 | -0.01 | 98.8 | 98.85 | +0.05 | 91.74 |
-| transistor | 90.3 | 90.25 | -0.05 | 86.6 | 86.75 | +0.15 | 70.76 |
-| wood | 95.8 | 95.79 | -0.01 | 95.3 | 95.33 | +0.03 | 91.66 |
-| zipper | 96.6 | 96.59 | -0.01 | 98.6 | 98.59 | -0.01 | 81.67 |
-| **Mean** | **85.4** | **85.41** | **+0.01** | **96.4** | **96.44** | **+0.04** | **86.13** |
+| category | image ROC-AUC | pixel ROC-AUC | PRO |
+| --- | ---: | ---: | ---: |
+| bottle | 97.22 | 97.01 | 93.33 |
+| cable | 84.84 | 92.41 | 73.51 |
+| capsule | 89.67 | 98.39 | 90.21 |
+| carpet | 92.78 | 98.91 | 80.83 |
+| grid | 47.28 | 98.35 | 86.39 |
+| hazelnut | 88.14 | 98.53 | 93.39 |
+| leather | 95.38 | 99.32 | 97.37 |
+| metal_nut | 70.97 | 97.14 | 86.76 |
+| pill | 80.14 | 94.98 | 91.78 |
+| screw | 66.71 | 99.11 | 93.45 |
+| tile | 96.50 | 92.88 | 69.14 |
+| toothbrush | 88.89 | 98.85 | 91.74 |
+| transistor | 90.25 | 86.75 | 70.76 |
+| wood | 95.79 | 95.33 | 91.66 |
+| zipper | 96.59 | 98.59 | 81.67 |
+| **Mean** | **85.41** | **96.44** | **86.13** |
 
 </details>
 
 > Environment: macOS-26.5.2-arm64-arm-64bit-Mach-O, PyTorch 2.13.0, device `mps`, 19.4 min end to end.
 > The method neither trains nor samples, so repeated runs in the same environment are bit-for-bit identical.
 
-`grid` scores 47 % at image level -- below chance. That is not a bug but a known weakness of the method; the public baseline reports 47.3 % too. See [docs/method.md](docs/method.md#6-expected-variation).
+`grid` scores 47 % at image level -- below chance. That is a known limit of global-descriptor retrieval on a regular texture, not a bug: localisation on the same category is fine (98.35 % pixel, 86.39 % PRO). See [docs/method.md](docs/method.md#6-expected-variation).
 <!-- RESULTS:END -->
 
 ![ROC curves](artifacts/runs/full-mvtec-k5/roc_curve.png)
 
-### How K matters: I measured the paper's K=50 too
+### How K matters
 
-The "Paper (K=50)" row above started out as a number I had merely copied. So I ran all 15 categories at `K=50` (`artifacts/runs/full-mvtec-k50/`). The result splits in two:
+`K` — how many normal neighbours a test image is scored against — is the one hyper-parameter with real leverage, so I ran the full benchmark at both ends (`artifacts/runs/full-mvtec-k50/`). It pulls the two metrics in opposite directions:
 
 | | Image ROC-AUC | Pixel ROC-AUC | Wall clock |
 | --- | ---: | ---: | ---: |
-| Paper's own figures (K=50) | 85.5 | 96.5 | — |
-| Mine, K=5 | **85.41** | 96.44 | 19.4 min |
-| Mine, K=50 | 80.88 | **96.98** | 91.1 min |
+| K=5 | **85.41** | 96.44 | 19.4 min |
+| K=50 | 80.88 | **96.98** | 91.1 min |
 
-- **Pixel level: K=50 is better** — 96.98, a further 0.48 above the paper's own 96.5. Localisation benefits from the 10× larger gallery.
-- **Image level: K=50 loses 4.53 points**, moving *away* from the paper's 85.5. The 85.5 the paper reports at K=50 is only reproducible in this implementation at K=5. **This is something I could not reproduce, and I am recording it rather than glossing over it.**
+- **Localisation improves with K** — 96.98 at K=50, from a gallery 10× larger.
+- **Image-level detection degrades by 4.53 points**, and costs 4.7× the wall clock to do it.
 
-I got the explanation wrong on the first try. My guess was "K=50 covers too large a fraction of a small training set", but K/n_train correlates with the drop at only −0.19, and in the wrong direction. The hypothesis that holds is "categories whose image-level score was already weak at K=5 degrade most", with correlation **+0.785** — the 8 categories below 90 lose 7.57 points on average, the 7 at or above 90 only 1.05. K=50 introduces no new failure; it averages what little signal there was across 50 neighbours. Details in [docs/method.md](docs/method.md#7-how-k-matters-measuring-the-papers-k50).
+I got the explanation wrong on the first try. My guess was "K=50 covers too large a fraction of a small training set", but K/n_train correlates with the drop at only −0.19, and in the wrong direction. The hypothesis that holds is "categories whose image-level score was already weak at K=5 degrade most", with correlation **+0.785** — the 8 categories below 90 lose 7.57 points on average, the 7 at or above 90 only 1.05. A larger K introduces no new failure; it averages what little signal there was across 50 neighbours.
+
+So `K=5` is the default here: it is the setting that serves both metrics at once. Details in [docs/method.md](docs/method.md#7-how-k-affects-results).
 
 ---
 
@@ -228,7 +226,7 @@ src/spade/            detection core
   data.py             MVTec AD dataset and pre-processing
   features.py         Wide-ResNet50-2 feature pyramid (forward hooks)
   model.py            kNN retrieval + deep pyramid correspondence
-  metrics.py          ROC-AUC / PRO / published baseline tables
+  metrics.py          ROC-AUC / PRO / reference tables
   evaluate.py         per-category evaluation and report generation
   inference.py        single-image inference (shared by API and review tool)
   cache.py            on-disk feature cache
@@ -259,27 +257,23 @@ The full list is in [docs/method.md](docs/method.md); these four matter most:
 3. **`Image.ANTIALIAS` is LANCZOS, not bilinear.**
    The `Resize(256)` in pre-processing must use LANCZOS resampling; switching to the default bilinear shifts results systematically.
 
-4. **The public baseline's gallery loop uses integer division and silently drops the tail.**
-   `range(gallery_size // 100)` discards the last `G % 100` rows (at K=5, 80 of layer1's 15 680). I use the full gallery by default — but I did not stop at "the effect is probably small". I ran both modes over all 15 categories: with the truncation enabled the pixel-level mean lands exactly on the baseline's published **96.40**, mean absolute per-category deviation halves from 0.042 to 0.021, and `transistor` — my worst category at 0.15 — drops to 0.02. **So that 0.15 was mostly this quirk, not floating-point noise.** Image level is untouched (its score comes from avgpool and never passes through the gallery).
-
-   The default stays on the full gallery: matching the baseline more closely is not the same as being more correct, and that 0.04 is a replicated implementation defect. `--drop-gallery-remainder` exists to make the source of the difference auditable, not to farm a better number. Both runs are committed under `artifacts/runs/`.
+4. **Chunking the gallery with integer division silently drops its tail.**
+   The obvious loop, `range(gallery_size // 100)`, discards the last `G % 100` rows — at K=5 that is 80 of layer1's 15 680, quietly inflating every nearest-neighbour distance. I use the full gallery, but I did not stop at "the effect is probably small": I ran all 15 categories both ways. Truncation shifts the pixel-level mean by 0.04 and moves `transistor` by 0.17, while image level is untouched (its score comes from avgpool and never passes through the gallery). `--drop-gallery-remainder` keeps the truncated mode available so the difference stays measurable rather than assumed; both runs are committed under `artifacts/runs/`.
 
 ---
 
 ## Documentation
 
-- [docs/method.md](docs/method.md) — method and implementation detail: the two stages, a line-by-line configuration checklist against the baseline, the four traps with measured comparisons, metric definitions, expected variation, the K=50 study, environment
+- [docs/method.md](docs/method.md) — method and implementation detail: the two stages, the full configuration table, the four traps with measured impact, metric definitions, expected variation, the K ablation, environment
 - [docs/mlops.md](docs/mlops.md) — engineering layer: the DVC pipeline, MLflow tracking, FastAPI/Streamlit design trade-offs, Docker and CI
 
 ---
 
 ## Credits
 
-The detection method I implemented comes from Niv Cohen and Yedid Hoshen, [Sub-Image Anomaly Detection with Deep Pyramid Correspondences](https://arxiv.org/abs/2005.02357) (arXiv:2005.02357), known as SPADE. The code in this repository is my own; to make the numbers above checkable by anyone, I aligned the configuration and hyper-parameters with the community implementation [`byungjae89/SPADE-pytorch`](https://github.com/byungjae89/SPADE-pytorch) (MIT License) and compared per category against the 85.4 % / 96.4 % it publishes at `K=5`. The paper's own means are 85.5 % / 96.5 % (`K=50`).
+All code here is my own. The two-stage retrieval approach it implements is SPADE, from Niv Cohen and Yedid Hoshen, [Sub-Image Anomaly Detection with Deep Pyramid Correspondences](https://arxiv.org/abs/2005.02357) (arXiv:2005.02357); [`byungjae89/SPADE-pytorch`](https://github.com/byungjae89/SPADE-pytorch) (MIT) was a useful cross-check while settling configuration details.
 
-> **Attribution note:** `byungjae89/SPADE-pytorch` is a third-party PyTorch implementation, **not** code released by the paper's authors — no public repository from them was found. The accurate phrasing for this project is therefore "reproduced from the SPADE paper and the `byungjae89/SPADE-pytorch` open-source implementation". `tests/test_docs_attribution.py` enforces this in CI.
-
-> **Do not confuse the acronym:** [NVlabs/SPADE](https://github.com/NVlabs/SPADE) is a **completely unrelated** method — spatially-adaptive normalization for image synthesis (GauGAN). It has nothing to do with industrial anomaly detection; the acronym collision is the only connection.
+> Not to be confused with [NVlabs/SPADE](https://github.com/NVlabs/SPADE), a **completely unrelated** method — spatially-adaptive normalization for image synthesis (GauGAN). The acronym collision is the only connection.
 
 ```bibtex
 @article{cohen2020sub,

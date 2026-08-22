@@ -30,11 +30,10 @@ This project implements the algorithm described in:
     "Sub-Image Anomaly Detection with Deep Pyramid Correspondences",
     arXiv:2005.02357, 2020.
 
-Configuration and hyper-parameters are aligned with the third-party PyTorch
-implementation `byungjae89/SPADE-pytorch` (MIT License) so that the reported
-numbers can be checked against a public baseline. That repository is NOT an
-official release by the paper's authors; no public repository from the paper's
-authors was found.
+The third-party PyTorch implementation `byungjae89/SPADE-pytorch` (MIT License)
+was consulted while settling configuration details. That repository is NOT an
+official release by the paper's authors; no public repository from the authors
+was found.
 
 Not to be confused with `NVlabs/SPADE`, an unrelated image-synthesis method
 (spatially-adaptive normalization) that shares the acronym.

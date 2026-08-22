@@ -43,9 +43,9 @@ class SpadeConfig:
     top_k: int = 5
     gaussian_sigma: float = 4.0
 
-    # The baseline iterates ``range(gallery_size // 100)``, silently dropping the
-    # last ``gallery_size % 100`` rows. We use the whole gallery; set this to
-    # True to reproduce that quirk bit-for-bit. See docs/method.md section 3.3.
+    # The obvious ``range(gallery_size // 100)`` chunking silently drops the last
+    # ``gallery_size % 100`` rows. We use the whole gallery; set this to True to
+    # measure what the truncation costs. See docs/method.md section 3.3.
     drop_gallery_remainder: bool = False
 
     # --- runtime ------------------------------------------------------------

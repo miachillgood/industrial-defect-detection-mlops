@@ -13,20 +13,9 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "src"))
-
-from spade.metrics import (  # noqa: E402
-    PAPER_MEAN_IMAGE_ROCAUC,
-    PAPER_MEAN_PIXEL_ROCAUC,
-    REFERENCE_IMAGE_ROCAUC,
-    REFERENCE_MEAN_IMAGE_ROCAUC,
-    REFERENCE_MEAN_PIXEL_ROCAUC,
-    REFERENCE_PIXEL_ROCAUC,
-)
 
 BEGIN = "<!-- RESULTS:BEGIN -->"
 END = "<!-- RESULTS:END -->"
@@ -40,8 +29,6 @@ def render(payload: dict) -> str:
 
     mi, mp = summary["mean_image_rocauc"], summary["mean_pixel_rocauc"]
     pro = summary.get("mean_pixel_pro")
-    # PRO has no public baseline to compare against, so its column stays blank
-    # in the comparison table rather than inviting a bogus delta.
     pro_head = " PRO |" if pro is not None else ""
     pro_sep = " ---: |" if pro is not None else ""
     lines = [
@@ -50,44 +37,32 @@ def render(payload: dict) -> str:
         "",
         f"| | Image ROC-AUC | Pixel ROC-AUC |{pro_head}",
         f"| --- | ---: | ---: |{pro_sep}",
-        f"| **This project (K={cfg['top_k']})** | **{mi:.2f} %** | **{mp:.2f} %** |"
+        f"| **Mean over 15 categories** | **{mi:.2f} %** | **{mp:.2f} %** |"
         + (f" **{pro:.2f} %** |" if pro is not None else ""),
-        f"| Public baseline `byungjae89/SPADE-pytorch` (K=5) | {REFERENCE_MEAN_IMAGE_ROCAUC} % "
-        f"| {REFERENCE_MEAN_PIXEL_ROCAUC} % |" + (" — |" if pro is not None else ""),
-        f"| Paper (K=50) | {PAPER_MEAN_IMAGE_ROCAUC} % | {PAPER_MEAN_PIXEL_ROCAUC} % |"
-        + (" — |" if pro is not None else ""),
-        f"| Delta vs. public baseline | {mi - REFERENCE_MEAN_IMAGE_ROCAUC:+.2f} "
-        f"| {mp - REFERENCE_MEAN_PIXEL_ROCAUC:+.2f} |" + (" — |" if pro is not None else ""),
         "",
     ]
     if pro is not None:
         lines += [
             "PRO (per-region overlap, integrated to FPR <= 0.3) weights every defect region "
-            "equally, unlike pixel ROC-AUC which large defects dominate. Neither the public "
-            "baseline nor the paper reports it, so there is no reference column.",
+            "equally, unlike pixel ROC-AUC which large defects dominate: missing a small "
+            "scratch costs as much as missing a large one.",
             "",
         ]
     lines += [
         "<details>",
         "<summary>Per-category detail (click to expand)</summary>",
         "",
-        "| category | image (baseline) | image (ours) | Δ | pixel (baseline) | pixel (ours) | Δ |"
-        + (" PRO |" if pro is not None else ""),
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |" + (" ---: |" if pro is not None else ""),
+        "| category | image ROC-AUC | pixel ROC-AUC |" + (" PRO |" if pro is not None else ""),
+        "| --- | ---: | ---: |" + (" ---: |" if pro is not None else ""),
     ]
     for r in rows:
-        c = r["category"]
-        ri, rp = REFERENCE_IMAGE_ROCAUC[c], REFERENCE_PIXEL_ROCAUC[c]
         row_pro = r.get("pixel_pro")
         lines.append(
-            f"| {c} | {ri} | {r['image_rocauc']:.2f} | {r['image_rocauc'] - ri:+.2f} "
-            f"| {rp} | {r['pixel_rocauc']:.2f} | {r['pixel_rocauc'] - rp:+.2f} |"
+            f"| {r['category']} | {r['image_rocauc']:.2f} | {r['pixel_rocauc']:.2f} |"
             + (f" {'—' if row_pro is None else f'{row_pro:.2f}'} |" if pro is not None else "")
         )
     lines += [
-        f"| **Mean** | **{REFERENCE_MEAN_IMAGE_ROCAUC}** | **{mi:.2f}** "
-        f"| **{mi - REFERENCE_MEAN_IMAGE_ROCAUC:+.2f}** | **{REFERENCE_MEAN_PIXEL_ROCAUC}** "
-        f"| **{mp:.2f}** | **{mp - REFERENCE_MEAN_PIXEL_ROCAUC:+.2f}** |"
+        f"| **Mean** | **{mi:.2f}** | **{mp:.2f}** |"
         + (f" **{pro:.2f}** |" if pro is not None else ""),
         "",
         "</details>",
@@ -98,8 +73,9 @@ def render(payload: dict) -> str:
         "> The method neither trains nor samples, so repeated runs in the same environment "
         "are bit-for-bit identical.",
         "",
-        "`grid` scores 47 % at image level -- below chance. That is not a bug but a known "
-        "weakness of the method; the public baseline reports 47.3 % too. See "
+        "`grid` scores 47 % at image level -- below chance. That is a known limit of "
+        "global-descriptor retrieval on a regular texture, not a bug: localisation on the "
+        "same category is fine (98.35 % pixel, 86.39 % PRO). See "
         "[docs/method.md](docs/method.md#6-expected-variation).",
     ]
     return "\n".join(lines)

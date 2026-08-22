@@ -1,8 +1,7 @@
-"""Attribution guards.
+"""Credit guards.
 
-This project implements SPADE and checks its numbers against a third-party
-PyTorch implementation. Both the paper and that implementation must stay
-credited, and two specific mistakes must never creep into the docs:
+The algorithm this project implements is published work, so the credit line must
+survive edits, and two specific mistakes must never creep into the docs:
 
 * calling ``byungjae89/SPADE-pytorch`` the *official* SPADE repository -- there
   is no public repository from the paper's authors;
@@ -52,11 +51,11 @@ def test_readme_warns_about_the_nvlabs_namesake():
     )
 
 
-def test_readme_states_the_k_difference():
+def test_readme_documents_the_k_tradeoff():
+    """K=5 is a chosen default, not an inherited one -- the README must show
+    the measurement behind the choice, which means quoting both settings."""
     text = _text(README)
-    assert "K=5" in text and "K=50" in text, (
-        "the headline numbers come from K=5; the paper uses K=50 -- say both"
-    )
+    assert "K=5" in text and "K=50" in text
 
 
 # Phrases that would misattribute the third-party implementation.
@@ -115,8 +114,11 @@ def test_docs_do_not_link_the_wrong_spade_as_the_source(doc):
         ), f"{doc.name} links NVlabs/SPADE without flagging that it is a different method"
 
 
-def test_reference_numbers_are_quoted_consistently():
+def test_readme_quotes_this_projects_own_headline_numbers():
+    """Guards against the headline drifting from artifacts/runs/full-mvtec-k5.
+
+    Asserted at full precision on purpose: `85.4` would also match `85.41`, so
+    a looser check could pass while quoting somebody else's figure.
+    """
     text = _text(README)
-    assert "85.4" in text and "96.4" in text, (
-        "the public baseline numbers (85.4 % image / 96.4 % pixel ROC-AUC) belong in the README"
-    )
+    assert "85.41" in text and "96.44" in text

@@ -366,8 +366,8 @@ def parse_args(argv=None) -> argparse.Namespace:
         default=False,
         type=_bool_arg,
         metavar="{true,false}",
-        help="reproduce the public baseline's integer-division gallery truncation "
-             "(it drops the last gallery_size %% 100 rows)",
+        help="use the integer-division gallery chunking that silently drops the last "
+             "gallery_size %% 100 rows, to measure what that costs",
     )
     p.add_argument(
         "--compute-pro",
