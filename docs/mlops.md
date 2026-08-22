@@ -1,139 +1,139 @@
-# MLOps 层
+# MLOps layer
 
-本文件描述检测算法之外的全部工程能力：数据与模型版本、实验记录、推理服务、人工审核闭环、容器化与 CI。
+This file covers everything outside the detection algorithm: data and model versioning, experiment tracking, the inference service, the human review loop, containerisation, and CI.
 
 ---
 
-## 这套流水线要解决的实际问题
+## The problem this pipeline actually solves
 
-这套检测方法的部署形态和普通深度模型不一样，工程上有三个直接后果：
+This detection method deploys unlike a normal deep model, with three direct engineering consequences:
 
-1. **没有权重文件。** "模型"= 冻结的 ImageNet 骨干 + 正常样本的特征库（memory bank）。所以**版本管理的对象是数据**，而不是 checkpoint —— 这正是 DVC 的用武之地。
-2. **artifact 很大。** bottle 的 209 张训练图，特征库 fp16 下 561 MB。绝不能进 git。
-3. **阈值是产品决策，不是训练结果。** 判定阈值由业务对漏检/误检的容忍度决定，需要人工标注反馈来调 —— 这是 Streamlit 审核工具存在的理由。
+1. **There is no weights file.** The "model" = a frozen ImageNet backbone + a memory bank of normal-sample features. So **what gets versioned is data**, not a checkpoint — which is exactly where DVC earns its place.
+2. **The artifact is large.** For bottle's 209 training images the feature bank is 561 MB at fp16. It must never go into git.
+3. **The threshold is a product decision, not a training outcome.** How much false-negative vs. false-positive risk to accept is a business call, tuned from human labelling feedback — which is why the Streamlit review tool exists.
 
 ```
-prepare_data ──► evaluate ──► build_bank ──► FastAPI 服务
+prepare_data ──► evaluate ──► build_bank ──► FastAPI service
      │              │              │              │
-    DVC           MLflow          DVC        Streamlit 审核
-   (数据版本)     (实验记录)     (模型版本)      (人工反馈)
+    DVC           MLflow          DVC        Streamlit review
+ (data version) (experiments)  (model version)  (human feedback)
                                                   │
-                                    阈值再标定 ◄───┘
+                                 threshold recalibration ◄───┘
 ```
 
 ---
 
-## 1. DVC：数据与模型版本管理
+## 1. DVC: data and model versioning
 
-### 为什么不是 git
+### Why not git
 
-`data/mvtec_anomaly_detection` 是 4.91 GiB、6 642 个文件（3 629 张训练图 + 1 725 张测试图 + 1 258 张真值掩码 + 少量说明文件）；`artifacts/banks/spade_bottle.pt` 561 MB。git 存不了这种东西。DVC 把内容哈希写进 `.dvc` 小文件由 git 跟踪，实际字节放到 remote。
+`data/mvtec_anomaly_detection` is 4.91 GiB across 6 642 files (3 629 training images + 1 725 test images + 1 258 ground-truth masks + a few readme files); `artifacts/banks/spade_bottle.pt` is 561 MB. git cannot hold this. DVC writes the content hash into a small `.dvc` file that git tracks, and keeps the actual bytes in a remote.
 
-### 常用命令
+### Everyday commands
 
 ```bash
-dvc status                 # 工作区与记录是否一致
-dvc repro                  # 按 dvc.yaml 跑完整流水线
-dvc metrics show           # 读 artifacts/runs/<run_name>/metrics.json
-dvc metrics diff HEAD~1    # 与上一次提交比指标
-dvc params diff            # 比 params.yaml
-dvc dag                    # 打印阶段依赖图
+dvc status                 # is the workspace consistent with the lock file
+dvc repro                  # run the full pipeline per dvc.yaml
+dvc metrics show           # read artifacts/runs/<run_name>/metrics.json
+dvc metrics diff HEAD~1    # compare metrics against the previous commit
+dvc params diff            # compare params.yaml
+dvc dag                    # print the stage dependency graph
 ```
 
-当前仓库里 `dvc metrics show` 的输出：
+`dvc metrics show` in this repository right now:
 
 ```
 Path                                       mean_image_rocauc  mean_pixel_rocauc  mean_pixel_pro  n_categories  delta_image_rocauc  delta_pixel_rocauc
 artifacts/runs/full-mvtec-k5/metrics.json  85.41              96.44              86.13           15            0.01                0.04
 ```
 
-### 特征缓存：DVC 管不到的那一层
+### The feature cache: the layer DVC cannot reach
 
-DVC 的缓存粒度是**阶段**。改 `params.yaml` 里的 `top_k`，整个 `evaluate` 阶段重跑——包括那 15 分钟的特征提取。但特征只取决于（数据集、骨干、预处理），**跟 K 和 sigma 毫无关系**。扫一遍 K 就白白重算十几次完全相同的张量。
+DVC caches at **stage** granularity. Change `top_k` in `params.yaml` and the whole `evaluate` stage re-runs — including the 15 minutes of feature extraction. But features depend only on (dataset, backbone, pre-processing) and have **nothing to do with K or sigma**. Sweeping K therefore recomputes identical tensors a dozen times for nothing.
 
-所以另加了一层阶段内缓存（`src/spade/cache.py`，默认关闭）：
+Hence a second cache layer inside the stage (`src/spade/cache.py`, off by default):
 
 ```bash
 python -m spade.evaluate --categories all --cache-features
 ```
 
-实测 toothbrush 第二遍命中缓存，结果完全相同，特征耗时 56s → 20s（剩下的 20s 是未缓存的测试集）。
+Measured: toothbrush hit the cache on a second run with identical results, and feature time fell from 56 s to 20 s (the remaining 20 s is the uncached test split).
 
-两个设计选择：
+Two design choices:
 
-- **只缓存训练集**，和参考实现一样。训练集是 5 354 张里的 3 629 张，占大头；而缓存测试集还要连输入张量一起存（定位可视化需要），不划算。
-- **缓存键覆盖所有能改变张量的因素**：类别、split、骨干、层集合、resize/crop、dtype、**torch 版本**。参考实现只用类名做键——改一下输入尺寸，它就会静默返回错误尺寸的特征。这条由 `tests/test_cache.py::test_every_input_dimension_changes_the_key` 锁住。
+- **Only the train split is cached**, the same choice the public baseline makes. Training is 3 629 of the 5 354 images, the bulk of it; caching the test split would also mean storing the input tensors the localisation figures need, which is not worth it.
+- **The cache key covers everything that can change the tensors**: category, split, backbone, layer set, resize/crop, dtype, and the **torch version**. The baseline keys on the class name alone — change the input size and it silently returns features of the wrong shape. `tests/test_cache.py::test_every_input_dimension_changes_the_key` pins this.
 
-缓存体积可以直接算：一张训练图的四层特征在 float32 下是 `256·56² + 512·28² + 1024·14² + 2048` 个数 ≈ 5.37 MB，3 629 张训练图合计 **19.0 GB**（float16 减半到 9.5 GB）。实测 toothbrush 的 60 张是 329 MB，与算出来的 322 MB 对得上（差值是 `torch.save` 的开销和标签/掩码）。
+The cache size can be computed directly: one training image's four hooked layers at float32 is `256·56² + 512·28² + 1024·14² + 2048` numbers ≈ 5.37 MB, so 3 629 training images total **19.0 GB** (halved to 9.5 GB at float16). Measured: toothbrush's 60 images take 329 MB against the 322 MB computed (the gap is `torch.save` overhead plus labels/masks).
 
-这 19 GB 已在 `.gitignore` 里，也不进 DVC——它完全可以从数据集重新生成，没有版本化的价值。
+Those 19 GB are in `.gitignore` and stay out of DVC too — they regenerate from the dataset, so there is nothing worth versioning.
 
-### README 结果表的自校验有个坑
+### The README result table's self-check had a trap
 
-README 的结果表由 `scripts/update_readme_results.py` 从 `results.json` 生成，CI 会用 `--check` 复核。最初 `--check` 的实现是"取 `artifacts/` 下 mtime 最新的 `results.json`"——加进第二个运行目录（丢尾对照实验）的当天就炸了：它去和消融实验对比，然后把完全正确的 README 报成 stale。
+The README's result table is generated from `results.json` by `scripts/update_readme_results.py`, and CI re-checks it with `--check`. The original `--check` implementation took "the most recently modified `results.json` anywhere under `artifacts/`" — which broke the day a second run directory was added (the gallery-truncation ablation): it compared against the ablation and reported a perfectly correct README as stale.
 
-改成在结果块里写一行来源标记：
+The fix writes a source marker into the result block:
 
 ```html
 <!-- source: artifacts/runs/full-mvtec-k5/results.json -->
 ```
 
-`--check` 读这一行来决定跟谁比，README 因此自描述。回归测试 `tests/test_readme_sync.py::test_check_uses_the_declared_run_not_the_newest` 会同时验证"有标记时正确"和"去掉标记后确实会误报"，保证这个守卫不是摆设。
+`--check` reads that line to decide what to compare against, so the README is self-describing. The regression test `tests/test_readme_sync.py::test_check_uses_the_declared_run_not_the_newest` verifies both that the marker works *and* that removing it really does produce the false alarm — so the guard is not decorative.
 
-### git 与 DVC 的分工
+### The git / DVC split
 
-`dvc.yaml` 里用 `cache: false` 明确划线：
+`dvc.yaml` draws the line explicitly with `cache: false`:
 
-- **git 管**：JSON 报告、`results.md`、ROC 曲线、15 类定位可视化——小、可读、要在页面上直接看到的证据；
-- **DVC 管**：5 GB 数据集和 561 MB 特征库——只在 git 里留哈希。
+- **git owns**: the JSON reports, `results.md`, the ROC curves, the 15 categories' localisation figures — small, readable evidence you want visible on the page;
+- **DVC owns**: the 5 GB dataset and the 561 MB feature bank — git sees only a hash.
 
-### 流水线
+### The pipeline
 
-`dvc.yaml` 定义三个阶段，依赖变了才重跑：
+`dvc.yaml` defines three stages that re-run only when their dependencies change:
 
-| 阶段 | 命令 | 输出 |
+| Stage | Command | Outputs |
 | --- | --- | --- |
 | `check_data` | `scripts/prepare_data.py --check-only --strict` | — |
 | `evaluate` | `python -m spade.evaluate` | `results.json` / `results.md` / `metrics.json` / `roc_curve.png` / `images/` |
-| `build_bank` | `scripts/build_bank.py` | `spade_<category>.pt` + 标定元数据 |
+| `build_bank` | `scripts/build_bank.py` | `spade_<category>.pt` + calibration metadata |
 
-改 `params.yaml` 里的 `evaluate.top_k`（比如从 5 改成论文的 50），`dvc repro` 只会重跑 `evaluate` 和 `build_bank`，不会重新校验数据。
+Change `evaluate.top_k` in `params.yaml` (say from 5 to the paper's 50) and `dvc repro` re-runs only `evaluate` and `build_bank`, not the data verification.
 
-一个 DVC 的实际约束：`dvc.yaml` 的 `cmd` 没有条件语法，`${evaluate.compute_pro}` 只能被无条件展开。所以 `--compute-pro` 被实现成"既能当裸开关、也能带值"（`--compute-pro` / `--compute-pro false`），而不是普通的 `store_true`。这条约束由 `tests/test_cli.py::test_dvc_style_invocation_parses` 锁住。
+One practical DVC constraint: `dvc.yaml`'s `cmd` has no conditional syntax, so `${evaluate.compute_pro}` can only be expanded unconditionally. That is why `--compute-pro` is implemented to work **both as a bare flag and with a value** (`--compute-pro` / `--compute-pro false`) rather than as a plain `store_true`. `tests/test_cli.py::test_dvc_style_invocation_parses` pins the constraint.
 
-### remote
+### Remote
 
-仓库里默认配置的是仓库内的本地 remote（`.dvcstore`，已在 `.gitignore` 里），克隆下来就能用。生产换成对象存储只改一行：
+The repository ships with an in-repo local remote configured (`.dvcstore`, already gitignored), so a fresh clone works immediately. Switching to object storage in production is a one-line change:
 
 ```bash
-dvc remote add -d store s3://my-bucket/spade     # 或 gs:// / azure:// / ssh://
+dvc remote add -d store s3://my-bucket/spade     # or gs:// / azure:// / ssh://
 dvc push
 ```
 
-macOS 的 APFS 支持 reflink，`.dvc/config` 里配了 `cache.type = reflink,hardlink,copy`，所以把 5 GB 数据集纳入 DVC 只花了 8 秒、几乎不占额外磁盘。
+macOS APFS supports reflinks, and `.dvc/config` sets `cache.type = reflink,hardlink,copy`, so bringing the 5 GB dataset under DVC took 8 seconds and almost no extra disk.
 
 ---
 
-## 2. MLflow：实验记录
+## 2. MLflow: experiment tracking
 
-`src/mlops/tracking.py` 是一层薄封装，设计上**失败不影响主流程**：MLflow 装没装、服务通不通，`make eval` 都必须能跑完并写出 `results.json`。追踪是观测手段，不是运行依赖。
+`src/mlops/tracking.py` is a thin wrapper, deliberately **fail-soft**: whether or not MLflow is installed, whether or not its server is reachable, `make eval` must still finish and write `results.json`. Tracking is observation, not a runtime dependency.
 
-每次运行记录：
+Each run records:
 
-- **params**：`top_k`、`backbone`、`resize`/`cropsize`、`device`、torch 版本、平台
-- **metrics**：15 个类各自的 `image_rocauc` / `pixel_rocauc`，以及 `mean_image_rocauc` / `mean_pixel_rocauc` / `wall_clock_s`
-- **artifacts**：整个运行目录（对照表、ROC 曲线、定位可视化）
+- **params**: `top_k`, `backbone`, `resize`/`cropsize`, `device`, torch version, platform
+- **metrics**: per-category `image_rocauc` / `pixel_rocauc` / `pixel_pro` for all 15, plus `mean_image_rocauc` / `mean_pixel_rocauc` / `mean_pixel_pro` / `wall_clock_s`
+- **artifacts**: the whole run directory (comparison tables, ROC curves, localisation figures)
 
 ```bash
 make mlflow                                    # UI -> http://localhost:5000
 MLFLOW_TRACKING_URI=http://localhost:5000 make eval
 ```
 
-默认后端是 `sqlite:///mlflow.db`，本地文件数据库，不需要起服务。
+The default backend is `sqlite:///mlflow.db`, a local file database that needs no server.
 
-> **踩过的坑：** 最初默认用的是 `file:./mlruns`。MLflow 3.15 把纯文件后端置为 maintenance mode，现在会直接抛异常（除非设 `MLFLOW_ALLOW_FILE_STORE=true`）。这次刚好验证了 fail-soft 的设计是对的——追踪初始化失败时，15 类的评估照常跑完并写出了 `results.json`，只在日志里留下一行 `[spade] MLflow disabled (...)`。事后用 `log_existing_run()` 把那次运行补录进去即可，不用重跑 21 分钟。
+> **A trap I hit:** the default started out as `file:./mlruns`. MLflow 3.15 put the plain-file backend into maintenance mode and now raises outright (unless `MLFLOW_ALLOW_FILE_STORE=true`). That accident happened to validate the fail-soft design — when tracking initialisation threw, the 15-category evaluation still ran to completion and wrote `results.json`, leaving just one line in the log: `[spade] MLflow disabled (...)`. Backfilling that run afterwards with `log_existing_run()` cost nothing, instead of re-running 21 minutes.
 
-离线跑完再补记录：
+Backfilling an offline run:
 
 ```python
 from mlops.tracking import log_existing_run
@@ -142,73 +142,75 @@ log_existing_run("artifacts/runs/full-mvtec-k5/results.json")
 
 ---
 
-## 3. FastAPI：推理接口
+## 3. FastAPI: the inference service
 
 ```bash
 make api        # http://localhost:8000/docs
 ```
 
-| 端点 | 用途 |
+| Endpoint | Purpose |
 | --- | --- |
-| `GET /health` | 存活探针 + 已加载的类别 |
-| `GET /models` | 每个 memory bank 的元数据与标定信息 |
-| `GET /stats` | 请求数、异常判定数、平均时延 |
-| `POST /predict?category=bottle` | 返回分数、判定、base64 热力图与掩码 |
-| `POST /predict/overlay?category=bottle` | 直接返回叠加后的 PNG |
+| `GET /health` | Liveness probe + loaded categories |
+| `GET /models` | Per-bank metadata and calibration details |
+| `GET /stats` | Request count, anomaly count, mean latency |
+| `POST /predict?category=bottle` | Score, verdict, base64 heatmap and mask |
+| `POST /predict/overlay?category=bottle` | The blended overlay straight back as a PNG |
 
 ```bash
 curl -s -F 'file=@data/mvtec_anomaly_detection/bottle/test/broken_large/000.png' \
   'http://localhost:8000/predict?category=bottle&include_images=false' | jq
 ```
 
-实测（bottle，阈值 6.78）：
+Measured (bottle, threshold 6.78):
 
-| 输入 | image_score | 判定 | 异常像素占比 |
+| Input | image_score | Verdict | Anomalous pixels |
 | --- | ---: | --- | ---: |
 | `test/good/000.png` | 4.91 | OK | 0.28 % |
 | `test/broken_large/000.png` | 10.57 | DEFECT | 23.4 % |
 
-`POST /predict/overlay` 直接返回叠加图：
+`POST /predict/overlay` returns the overlay directly:
 
 ![API overlay](assets/api_overlay_bottle_broken_large_000.png)
 
-设计要点：
+Design points:
 
-- **按需加载。** 每个类别的 bank 首次请求时才载入并缓存，加锁保证线程安全。`SPADE_EAGER_LOAD=1` 可改为启动时全部载入（容器里配合就绪探针更合适）。
-- **bank 不进镜像。** 它是数据，由 DVC 管理，通过 volume 挂载。镜像里只烘焙 ImageNet 权重，保证冷启动不联网。
-- **缺 bank 返回 404 而不是崩溃。** 错误信息直接告诉你去跑 `scripts/build_bank.py`。
+- **Lazy loading.** Each category's bank loads on first request and is then cached, guarded by a lock for thread safety. `SPADE_EAGER_LOAD=1` switches to loading everything at startup, which pairs better with a readiness probe in a container.
+- **The bank stays out of the image.** It is data, managed by DVC, mounted as a volume. Only the ImageNet weights are baked in, so a cold container never reaches the network.
+- **A missing bank returns 404 rather than crashing.** The error message tells you to run `scripts/build_bank.py`.
 
-### 阈值怎么来的
+### Where the thresholds come from
 
-`scripts/build_bank.py` 在**训练集内部**做留一法：把每张训练图当查询，排除自己后取 K 近邻算分，得到"正常样本分数分布"，再取分位数作阈值（默认图像级 P99、像素级 P99.5）。**全程不碰测试集**，所以报告的 ROC-AUC 没有被阈值标定污染。
+`scripts/build_bank.py` does leave-one-out **inside the training split**: score each training image as a query against its K nearest neighbours excluding itself, obtain the "normal score distribution", and take a percentile as the threshold (image-level P99, pixel-level P99.5 by default). **The test split is never touched**, so the reported ROC-AUC is not contaminated by threshold calibration.
 
 ---
 
-## 4. Streamlit：标注审核工具
+## 4. Streamlit: the annotation review tool
 
 ```bash
 make review     # http://localhost:8501
 ```
 
-人在回路的界面：模型给判定和缺陷掩码，质检员确认或推翻，每条决定追加进 `artifacts/reviews/reviews.jsonl`。
+A human-in-the-loop interface: the model proposes a verdict and a defect mask, the inspector confirms or overrides it, and every decision is appended to `artifacts/reviews/reviews.jsonl`.
 
-**审核队列**：并排显示输入图 / 热力图 / 预测掩码 / 真值掩码（测试集样本才有），给出分数、阈值、模型判定与异常像素占比；质检员选 `ok` / `defect` / `unsure`，可填缺陷类型和备注。侧边栏的阈值滑块可以实时看判定怎么随阈值变化 —— 这正是这个工具的核心价值。
+**Review queue**: input / heatmap / predicted mask / ground-truth mask (test-split samples only) side by side, with the score, threshold, model verdict and anomalous-pixel fraction; the inspector picks `ok` / `defect` / `unsure` and can add a defect type and notes. The threshold sliders in the sidebar show live how verdicts shift with the threshold — that is the core value of this tool.
 
-**看板**：累计审核量、人机一致率、以人工判定为真值的混淆矩阵与 precision/recall/F1，以及"分歧列表"——这些就是重新标定阈值的依据。可导出 CSV。
+**Dashboard**: cumulative review count, human/model agreement rate, a confusion matrix with precision/recall/F1 treating the human verdict as truth, and a "disagreements" list — the raw material for re-calibrating the threshold. Exportable as CSV.
 
-存储用 append-only JSONL：
+Storage is append-only JSONL:
 
-- 多人同时审核不会互相覆盖
-- 改判是新增一条记录，不是就地修改，历史完整保留
-- 尾部写坏一行不会毁掉整个文件（`load()` 会跳过解析失败的行）
+- Two reviewers working at once cannot overwrite each other
+- A changed verdict is a new record, not an in-place edit, so history survives intact
+- A torn final line does not destroy the file (`load()` skips lines that fail to parse)
 
-`latest_per_image()` 按图片路径取最后一条决定作为当前状态。
+`latest_per_image()` takes the last decision per image path as the current state.
+
+Image paths are stored **relative to the repository root**. Absolute paths would make the log useless on any other machine, and would leak the reviewer's home directory into a file that gets shared.
 
 ---
 
 ## 5. Docker
 
-`docker/Dockerfile` 一个多阶段构建，两个目标：
+`docker/Dockerfile` is one multi-stage build with two targets:
 
 ```bash
 docker build -f docker/Dockerfile --target api    -t spade-api .
@@ -216,28 +218,62 @@ docker build -f docker/Dockerfile --target review -t spade-review .
 docker compose -f docker/docker-compose.yml up --build    # api + review + mlflow
 ```
 
-几个刻意的选择：
+Several deliberate choices:
 
-- **CPU 版 torch**（`--index-url https://download.pytorch.org/whl/cpu`）。默认源的 wheel 会拖进约 2 GB CUDA 库，在 CPU 容器里毫无用处。
-- **烘焙 ImageNet 权重**，冷启动不需要联网。
-- **非 root 用户**（uid 10001）。
-- **HEALTHCHECK** 打到各自的健康端点。
-- **bank 只读挂载**，不进镜像。
+- **CPU-only torch** (`--index-url https://download.pytorch.org/whl/cpu`). Wheels from the default index drag in about 2 GB of CUDA libraries that are useless in a CPU container. Both images come out at 2.03 GB.
+- **ImageNet weights baked in**, so a cold start needs no network.
+- **Non-root user** (uid 10001).
+- **HEALTHCHECK** pointed at each service's own health endpoint.
+- **The bank is mounted read-only**, never baked into the image.
+
+All three services are verified working:
+
+| Service | Check | Result |
+| --- | --- | --- |
+| `api` | `GET /health`, and `POST /predict` with no bank mounted | ok; 404 rather than a crash |
+| `review` | `GET /_stcore/health`, page render, container logs | ok; renders; no errors |
+| `mlflow` | `GET /health`, `GET /api/2.0/mlflow/experiments/search` | `OK`; API returns the default experiment |
+
+### Known limitation: a non-ASCII path breaks `docker compose build`
+
+If the repository sits at a path containing non-ASCII characters, `docker compose build` fails before it starts:
+
+```
+failed to dial gRPC: rpc error: code = Internal desc = header key
+"x-docker-expose-session-sharedkey" contains value with non-printable ASCII char
+```
+
+gRPC metadata only accepts printable ASCII (0x20–0x7E), and Compose passes the project path through into that session header. `COMPOSE_BAKE=false` does not help — it is not bake-specific.
+
+This is a Compose/buildx limitation, not a problem with the Dockerfile: `docker build` handles the same path fine, whether the context is given as `.` or as an absolute non-ASCII path. Both were verified.
+
+Two ways around it:
+
+```bash
+# 1. Build with docker build, then start without rebuilding
+docker build -f docker/Dockerfile --target api    -t spade-api:local .
+docker build -f docker/Dockerfile --target review -t spade-review:local .
+docker compose -f docker/docker-compose.yml up -d --no-build
+
+# 2. Or simply clone into an ASCII-only path
+```
+
+The `image:` keys in `docker-compose.yml` (`spade-api:local`, `spade-review:local`) are named exactly so that option 1 works: Compose picks up the pre-built images instead of building them.
 
 ---
 
 ## 6. GitHub Actions
 
-`.github/workflows/ci.yml` 三个 job：
+`.github/workflows/ci.yml` has three jobs:
 
-| Job | 内容 |
+| Job | Contents |
 | --- | --- |
 | `lint` | `ruff check .` |
-| `test` | Python 3.11 / 3.12 矩阵，跑 `pytest -m "not needs_data"`，缓存 torch hub 权重，产出覆盖率 |
-| `docker` | 构建 API 镜像并冒烟：起容器 → `/health` 就绪 → 无 bank 时 `/predict` 必须返回 404 |
+| `test` | Python 3.11 / 3.12 matrix, runs `pytest -m "not needs_data"`, caches the torch hub weights, emits coverage |
+| `docker` | Builds the API image and smoke-tests it: start container → `/health` becomes ready → `/predict` must return 404 while no bank is mounted |
 
-CI 里没有 5 GB 数据集，所以需要数据的测试用 `needs_data` 标记跳过；需要骨干网络的测试用 `needs_backbone` 标记，权重走 cache。
+CI has no 5 GB dataset, so tests that need it are marked `needs_data` and skipped; tests that need the backbone are marked `needs_backbone` and get their weights from the cache.
 
-`tests/test_docs_attribution.py` 把署名要求变成了会失败的测试：README 必须提到论文、作者、`byungjae89/SPADE-pytorch`、`NVlabs/SPADE` 的消歧说明、以及 `K=5` 与 `K=50` 的区别。任何文档若把这个第三方实现描述成论文作者发布的版本，CI 直接挂掉。
+`tests/test_docs_attribution.py` turns the attribution requirements into tests that can fail: the README must mention the paper, the authors, `byungjae89/SPADE-pytorch`, the `NVlabs/SPADE` disambiguation, and the difference between `K=5` and `K=50`. If any document describes the third-party implementation as a release by the paper's authors, CI goes red.
 
-这条检查带一个"守卫的守卫"：`test_the_attribution_guard_actually_catches_a_bare_claim` 保证正则本身没被改松。文档里允许**引用**错误说法来做反面警示（靠上下文里的否定词识别），但不允许直接这么断言。
+That check comes with a guard for the guard: `test_the_attribution_guard_actually_catches_a_bare_claim` ensures the regexes have not been loosened. Documents are allowed to **quote** the wrong phrasing as a warning (detected via negation cues in the surrounding context), but not to assert it.

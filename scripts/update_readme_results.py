@@ -100,7 +100,7 @@ def render(payload: dict) -> str:
         "",
         "`grid` scores 47 % at image level -- below chance. That is not a bug but a known "
         "weakness of the method; the public baseline reports 47.3 % too. See "
-        "[docs/method.md](docs/method.md#6-已知的正常波动).",
+        "[docs/method.md](docs/method.md#6-expected-variation).",
     ]
     return "\n".join(lines)
 

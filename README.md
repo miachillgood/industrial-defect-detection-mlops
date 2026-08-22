@@ -109,7 +109,7 @@ PRO (per-region overlap, integrated to FPR <= 0.3) weights every defect region e
 > Environment: macOS-26.5.2-arm64-arm-64bit-Mach-O, PyTorch 2.13.0, device `mps`, 19.4 min end to end.
 > The method neither trains nor samples, so repeated runs in the same environment are bit-for-bit identical.
 
-`grid` scores 47 % at image level -- below chance. That is not a bug but a known weakness of the method; the public baseline reports 47.3 % too. See [docs/method.md](docs/method.md#6-已知的正常波动).
+`grid` scores 47 % at image level -- below chance. That is not a bug but a known weakness of the method; the public baseline reports 47.3 % too. See [docs/method.md](docs/method.md#6-expected-variation).
 <!-- RESULTS:END -->
 
 ![ROC curves](artifacts/runs/full-mvtec-k5/roc_curve.png)
@@ -127,7 +127,7 @@ The "Paper (K=50)" row above started out as a number I had merely copied. So I r
 - **Pixel level: K=50 is better** — 96.98, a further 0.48 above the paper's own 96.5. Localisation benefits from the 10× larger gallery.
 - **Image level: K=50 loses 4.53 points**, moving *away* from the paper's 85.5. The 85.5 the paper reports at K=50 is only reproducible in this implementation at K=5. **This is something I could not reproduce, and I am recording it rather than glossing over it.**
 
-I got the explanation wrong on the first try. My guess was "K=50 covers too large a fraction of a small training set", but K/n_train correlates with the drop at only −0.19, and in the wrong direction. The hypothesis that holds is "categories whose image-level score was already weak at K=5 degrade most", with correlation **+0.785** — the 8 categories below 90 lose 7.57 points on average, the 7 at or above 90 only 1.05. K=50 introduces no new failure; it averages what little signal there was across 50 neighbours. Details in [docs/method.md](docs/method.md#7-k-的影响论文的-k50-实测).
+I got the explanation wrong on the first try. My guess was "K=50 covers too large a fraction of a small training set", but K/n_train correlates with the drop at only −0.19, and in the wrong direction. The hypothesis that holds is "categories whose image-level score was already weak at K=5 degrade most", with correlation **+0.785** — the 8 categories below 90 lose 7.57 points on average, the 7 at or above 90 only 1.05. K=50 introduces no new failure; it averages what little signal there was across 50 neighbours. Details in [docs/method.md](docs/method.md#7-how-k-matters-measuring-the-papers-k50).
 
 ---
 
@@ -182,6 +182,8 @@ All at once:
 ```bash
 docker compose -f docker/docker-compose.yml up --build
 ```
+
+> If the repository path contains non-ASCII characters, `docker compose build` fails with a gRPC "non-printable ASCII char" error — a Compose/buildx limitation, not a Dockerfile problem. Build with `docker build` and start with `--no-build`; see [docs/mlops.md](docs/mlops.md#known-limitation-a-non-ascii-path-breaks-docker-compose-build).
 
 Calling the inference API:
 
@@ -267,8 +269,6 @@ The full list is in [docs/method.md](docs/method.md); these four matter most:
 
 - [docs/method.md](docs/method.md) — method and implementation detail: the two stages, a line-by-line configuration checklist against the baseline, the four traps with measured comparisons, metric definitions, expected variation, the K=50 study, environment
 - [docs/mlops.md](docs/mlops.md) — engineering layer: the DVC pipeline, MLflow tracking, FastAPI/Streamlit design trade-offs, Docker and CI
-
-> The two documents above are still written in Chinese.
 
 ---
 
